@@ -97,7 +97,30 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     peaks, _ = find_peaks(gfp, distance=min_peak_dist)
 
     # TODO: Filter peaks that are too close to an event
-
+    #=======================================================================    
+    index_removal = []    
+    # Then we iterate through the peaks, and we discart the last peaks before 
+    # the epoch borders, and the first peaks after the epoch borders. 
+    for n in range(n_epochs-1):
+        #print("Epoch number:", n)
+        epo_end = len_epoch * (n+1)
+        last_peak = np.where(peaks<epo_end)[0][-1] 
+        # position of last peak of an epoch
+        first_peak = np.where(peaks>epo_end)[0][0] 
+        # position of first peak after an epoch
+        l_f_peaks = [peaks[last_peak], peaks[first_peak]]
+        index_removal.extend(l_f_peaks)
+    
+    # Remove the peaks around the ends of the epochs
+    peaks = np.delete(peaks, index_removal)
+    
+    # At the end we remove the first peak of the first epoch
+    # and the last peak of the last epoch.
+    peaks = np.delete(peaks, 0)
+    peaks = np.delete(peaks, -1)
+    #print("Done with the peaks cleaning.")
+    #=======================================================================
+        
     n_peaks = len(peaks)
 
     # Limit the number of peaks by randomly selecting them
