@@ -81,12 +81,23 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     logger.info('Finding %d microstates, using %d random intitializations' %
                 (n_states, n_inits))
 
+    if len(data.shape) == 3:
+        logger.info('Finding microstates from epoched data.')
+        n_epochs, n_chans, n_samples = data.shape
+        # Make 2D and keep events info
+        data = np.hstack(data)
+        events = np.arange(0, data.shape[1], n_samples)
+
     if normalize:
         data = zscore(data, axis=1)
+
 
     # Find peaks in the global field power (GFP)
     gfp = np.mean(data ** 2, axis=0)
     peaks, _ = find_peaks(gfp, distance=min_peak_dist)
+
+    # TODO: Filter peaks that are too close to an event
+
     n_peaks = len(peaks)
 
     # Limit the number of peaks by randomly selecting them
