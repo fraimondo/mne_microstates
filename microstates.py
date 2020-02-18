@@ -97,7 +97,8 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     peaks, _ = find_peaks(gfp, distance=min_peak_dist)
 
     # TODO: Filter peaks that are too close to an event
-    #=======================================================================    
+    #=======================================================================  
+    len_epoch = n_samples
     index_removal = []  
     # Then we iterate through the peaks, and we discart the last peaks before 
     # the epoch borders, and the first peaks after the epoch borders. 
