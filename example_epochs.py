@@ -34,3 +34,14 @@ maps, segmentation = microstates.segment(epochs.get_data(), n_states=5)
 microstates.plot_maps(maps, epochs.info)
 microstates.plot_segmentation(segmentation[:500], raw.get_data()[:, :500],
                               raw.times[:500])
+
+# Analyses
+### p_empirical 
+p_hat = p_empirical(segmentation, n_states)
+print("\n\t\tEmpirical symbol distribution (RTT):\n")
+for i in range(n_states): print("\t\tp_{:d} = {:.3f}".format(i, p_hat[i]))
+
+### T_empirical
+T_hat = T_empirical(segmentation, n_states)
+print("\n\t\tEmpirical transition matrix:\n")
+print_matrix(T_hat)
