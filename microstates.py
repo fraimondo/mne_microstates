@@ -82,11 +82,14 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                 (n_states, n_inits))
 
     if len(data.shape) == 3:
+        epo_data = True
         logger.info('Finding microstates from epoched data.')
         n_epochs, n_chans, n_samples = data.shape
         # Make 2D and keep events info
         data = np.hstack(data)
         events = np.arange(0, data.shape[1], n_samples)
+     else:
+        epo_data = False
 
     if normalize:
         data = zscore(data, axis=1)
@@ -95,32 +98,31 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     # Find peaks in the global field power (GFP)
     gfp = np.mean(data ** 2, axis=0)
     peaks, _ = find_peaks(gfp, distance=min_peak_dist)
-
-    # TODO: Filter peaks that are too close to an event
-    #=======================================================================  
-    len_epoch = n_samples
-    index_removal = []  
-    # Then we iterate through the peaks, and we discart the last peaks before 
-    # the epoch borders, and the first peaks after the epoch borders. 
-    for n in range(n_epochs-1):
-        #print("Epoch number:", n)
-        epo_end = len_epoch * (n+1)
-        epo_end_dist_neg = epo_end - (min_peak_dist-1)
-        epo_end_dist_pos = epo_end + min_peak_dist
-        for i in range(epo_end_dist_neg, epo_end_dist_pos):
-            if i in peaks:
-                peak = np.where(peaks == i) # finds the indice of a value
-                index_removal.extend(peak)
     
-    # Remove the peaks around the ends of the epochs
-    peaks = np.delete(peaks, index_removal)
-    
-    # At the end we remove the first peak of the first epoch
-    # and the last peak of the last epoch.
-    peaks = np.delete(peaks, 0)
-    peaks = np.delete(peaks, -1)
-    #print("Done with the peaks cleaning.")
-    #=======================================================================
+    if epo_data == True:
+        # Filter peaks that are too close to an event
+        len_epoch = n_samples
+        index_removal = []  
+        # Then we iterate through the peaks, and we discart the last peaks before 
+        # the epoch borders, and the first peaks after the epoch borders. 
+        for n in range(n_epochs-1):
+            #print("Epoch number:", n)
+            epo_end = len_epoch * (n+1)
+            epo_end_dist_neg = epo_end - (min_peak_dist-1)
+            epo_end_dist_pos = epo_end + min_peak_dist
+            for i in range(epo_end_dist_neg, epo_end_dist_pos):
+                if i in peaks:
+                    peak = np.where(peaks == i) # finds the indice of a value
+                    index_removal.extend(peak)
+        
+        # Remove the peaks around the ends of the epochs
+        peaks = np.delete(peaks, index_removal)
+        
+        # At the end we remove the first peak of the first epoch
+        # and the last peak of the last epoch.
+        peaks = np.delete(peaks, 0)
+        peaks = np.delete(peaks, -1)
+        #print("Done with the peaks cleaning.")
         
     n_peaks = len(peaks)
 
