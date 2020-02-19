@@ -25,12 +25,12 @@ epochs = mne.Epochs(raw, events, event_id=event_id, tmin=-0.2, tmax=.5,
 
 # Select sensor type
 # raw.pick_types(meg=False, eeg=True)
-epochs.pick_types(meg='mag', eeg=False)
+epochs.pick_types(meg=False, eeg=True)
 
 # Segment the data in 6 microstates
 maps, segmentation = microstates.segment(epochs.get_data(), n_states=5)
 
 # Plot the topographic maps of the microstates and the segmentation
-microstates.plot_maps(maps, raw.info)
+microstates.plot_maps(maps, epochs.info)
 microstates.plot_segmentation(segmentation[:500], raw.get_data()[:, :500],
                               raw.times[:500])
