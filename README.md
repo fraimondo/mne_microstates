@@ -36,7 +36,7 @@ microstates.viz.plot_segmentation(
 ```
 
 ## Authors
-Marijn van Vliet <w.m.vanvliet_at_gmail.com>
-Frederic von Wegner <fvwegner_at_gmail.com>
-Federico Raimondo <federaimondo_at_gmail.com>
-Dragana Mana <dragana.manasova_at_gmail.com>
+* Marijn van Vliet <w.m.vanvliet_at_gmail.com>
+* Frederic von Wegner <fvwegner_at_gmail.com>
+* Federico Raimondo <federaimondo_at_gmail.com>
+* Dragana Mana <dragana.manasova_at_gmail.com>
