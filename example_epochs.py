@@ -1,5 +1,9 @@
 import mne
-import microstates
+import sys
+# Path to the folder where the working scripts of mne_microstates are
+sys.path.append("C:/Users/Dragana/Documents/Python_Scripts/py_M2_internship/Colab/mne_microstates")
+import analysis as mstan # I import them like this so I track which function is from where
+import microstates as mst
 
 from mne.datasets import sample
 fname = sample.data_path() + '/MEG/sample/sample_audvis_filt-0-40_raw.fif'
@@ -27,21 +31,37 @@ epochs = mne.Epochs(raw, events, event_id=event_id, tmin=-0.2, tmax=.5,
 # raw.pick_types(meg=False, eeg=True)
 epochs.pick_types(meg=False, eeg=True)
 
+
+#================ Microstates ================#
+# Parameteres setting up
+n_states = 5
+n_inits = 5
+
 # Segment the data in 6 microstates
-maps, segmentation = microstates.segment(epochs.get_data(), n_states=5)
+maps, segmentation, gev, gfp_peaks = mst.segment(epochs.get_data(), n_states, n_inits)
 
 # Plot the topographic maps of the microstates and the segmentation
-microstates.plot_maps(maps, epochs.info)
-microstates.plot_segmentation(segmentation[:500], raw.get_data()[:, :500],
-                              raw.times[:500])
+mst.plot_maps(maps, epochs.info)
+mst.plot_segmentation(segmentation[:500], raw.get_data()[:, :500], raw.times[:500])
 
-# Analyses
-### p_empirical 
-p_hat = p_empirical(segmentation, n_states)
+
+#================ Analyses ================#
+# p_empirical 
+p_hat = mstan.p_empirical(segmentation, n_states)
 print("\n\t\tEmpirical symbol distribution (RTT):\n")
 for i in range(n_states): print("\t\tp_{:d} = {:.3f}".format(i, p_hat[i]))
 
-### T_empirical
-T_hat = T_empirical(segmentation, n_states)
+# T_empirical
+T_hat = mstan.T_empirical(segmentation, n_states)
 print("\n\t\tEmpirical transition matrix:\n")
-print_matrix(T_hat)
+mstan.print_matrix(T_hat)
+
+# Peaks Per Second (PPS)
+fs = epochs.info['sfreq']
+pps = len(gfp_peaks) / (len(segmentation)/fs)  # peaks per second
+print("\n\t\tGFP peaks per sec.: {:.2f}".format(pps))
+
+# Global Explained Variance (GEV)
+print("\n\t\tGlobal explained variance (GEV) per map:")
+print ("\t\t" + str(gev))
+print("\n\t\ttotal GEV: {:.2f}".format(gev.sum()))

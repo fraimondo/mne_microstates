@@ -9,6 +9,7 @@ https://github.com/Frederic-vW/eeg_microstates
 ----- In progress -----
 Analyses for the microstates...
 """
+import numpy as np
 
 def p_empirical(segmentation, n_states=4):
     """Empirical symbol distribution

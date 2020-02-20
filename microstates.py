@@ -70,6 +70,8 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     segmentation : ndarray, shape (n_samples,)
         For each sample, the index of the microstate to which the sample has
         been assigned.
+    best_gev : the best Global Explained Variance (GEV)
+    peaks : the GFP peaks 
 
     References
     ----------
@@ -87,8 +89,8 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         n_epochs, n_chans, n_samples = data.shape
         # Make 2D and keep events info
         data = np.hstack(data)
-        events = np.arange(0, data.shape[1], n_samples)
-     else:
+#        events = np.arange(0, data.shape[1], n_samples)
+    else:
         epo_data = False
 
     if normalize:
@@ -155,7 +157,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         if gev > best_gev:
             best_gev, best_maps, best_segmentation = gev, maps, segmentation
 
-    return best_maps, best_segmentation
+    return best_maps, best_segmentation, best_gev, peaks
 
 
 @verbose
