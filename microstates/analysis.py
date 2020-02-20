@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Feb 19 13:36:13 2020
 
@@ -6,8 +5,7 @@ Part of the following functions are adapted from
 the toolbox eeg_microstates
 https://github.com/Frederic-vW/eeg_microstates
 
------ In progress -----
-Analyses for the microstates...
+Microstates analysis functions
 """
 import numpy as np
 
