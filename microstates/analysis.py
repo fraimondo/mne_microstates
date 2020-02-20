@@ -11,6 +11,9 @@ import numpy as np
 
 def p_empirical(segmentation, n_states=4):
     """Empirical symbol distribution
+    Or in other words of Michel2018, Segment Count Density:
+        the fraction of total recording time for which a given microstate
+        is dominant. 
 
     Args:
         segmentation : ndarray, shape (n_samples,)
@@ -27,6 +30,32 @@ def p_empirical(segmentation, n_states=4):
     p /= n
     return p
 
+def mean_dur(segmentation, sfreq, n_states=4):
+    """Mean duration of segments
+        Average duration that a microstate remains stable. 
+
+    Args:
+        segmentation : ndarray, shape (n_samples,)
+        For each sample, the index of the microstate to which the sample has
+        been assigned.
+        sfreq : sampling frequency 
+        n_states: number of microstate clusters
+    Returns:
+        mean_durs : ndarray, shape (n_states,)
+            the mean durations per state in seconds
+    """
+    durs = np.zeros((n_states, 2)) 
+    n = len(segmentation)
+    dur = 0
+    for i in range(n):
+        dur += 1
+        if i == (n-1) or (segmentation[i+1] != segmentation[i]):
+            durs[segmentation[i]][0] += dur
+            durs[segmentation[i]][1] += 1
+            dur = 0 
+    mean_durs = durs[:, 0] / durs[:, 1]
+    mean_durs /= sfreq
+    return mean_durs
 
 def T_empirical(segmentation, n_states):
     """Empirical transition matrix

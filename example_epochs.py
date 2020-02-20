@@ -64,6 +64,11 @@ pps = len(gfp_peaks) / (len(segmentation)/fs)  # peaks per second
 print("\n\t\tGFP peaks per sec.: {:.2f}".format(pps))
 
 # Global Explained Variance (GEV)
-print("\n\t\tGlobal explained variance (GEV) per map:")
+print("\n\t\tGlobal explained variance (GEV):")
 print ("\t\t" + str(gev))
-print("\n\t\ttotal GEV: {:.2f}".format(gev.sum()))
+
+# Mean durations of states 
+mean_durs = mst.analysis.mean_dur(segmentation, n_states, epochs.info['sfreq'])
+print("\n\t\t Mean microstate durations:\n")
+for i in range(n_states): 
+    print("\t\tp_{:d} = {:.3f}".format(i, mean_durs[i]))
