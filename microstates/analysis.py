@@ -44,7 +44,7 @@ def mean_dur(segmentation, sfreq, n_states=4):
         mean_durs : ndarray, shape (n_states,)
             the mean durations per state in seconds
     """
-    durs = np.zeros((n_states, 2)) 
+    durs = np.zeros((int(n_states), 2)) 
     n = len(segmentation)
     dur = 0
     for i in range(n):

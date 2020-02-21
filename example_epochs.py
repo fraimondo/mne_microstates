@@ -33,8 +33,21 @@ epochs.pick_types(meg=False, eeg=True)
 
 #================ Microstates ================#
 # Parameteres setting up
-n_states = 5
+n_states = 4
 n_inits = 5
+EGI256 = True 
+sfreq = epochs.info['sfreq']
+
+# Removing channels 
+if EGI256 == True:
+    epochs.drop_channels(['E67', 'E73', 'E247', 'E251', 'E256', 'E243', 'E246', 'E250', 
+                          'E255', 'E82', 'E91', 'E254', 'E249', 'E245', 'E242', 'E253',
+                          'E252', 'E248', 'E244', 'E241', 'E92', 'E102', 'E103', 'E111', 
+                          'E112', 'E120', 'E121', 'E133', 'E134', '145', 'E146', 'E156', 
+                          'E165', 'E166', 'E174', 'E175', 'E187', 'E188', 'E199', 'E200', 
+                          'E208', 'E209', 'E216', 'E217', 'E228', 'E229', 'E232', 'E233',  
+                          'E236', 'E237', 'E240', 'E218', 'E227', 'E231', 'E235', 'E239', 
+                          'E219', 'E225', 'E226', 'E230', 'E234', 'E238'])
 
 # Segment the data in 6 microstates
 maps, segmentation, gev, gfp_peaks = mst.segment(
@@ -68,7 +81,7 @@ print("\n\t\tGlobal explained variance (GEV):")
 print ("\t\t" + str(gev))
 
 # Mean durations of states 
-mean_durs = mst.analysis.mean_dur(segmentation, n_states, epochs.info['sfreq'])
-print("\n\t\t Mean microstate durations:\n")
+mean_durs = mst.analysis.mean_dur(segmentation, epochs.info['sfreq'], n_states)
+print("\n\t\t Mean microstate durations in ms:\n")
 for i in range(n_states): 
-    print("\t\tp_{:d} = {:.3f}".format(i, mean_durs[i]))
+    print("\t\tp_{:d} = {:.3f}".format(i, mean_durs[i]*1000))
