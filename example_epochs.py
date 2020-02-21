@@ -81,7 +81,7 @@ print("\n\t\tGlobal explained variance (GEV):")
 print ("\t\t" + str(gev))
 
 # Mean durations of states 
-mean_durs = mst.analysis.mean_dur(segmentation, epochs.info['sfreq'], n_states)
+mean_durs = mst.analysis.mean_dur(segmentation, sfreq], n_states)
 print("\n\t\t Mean microstate durations in ms:\n")
 for i in range(n_states): 
     print("\t\tp_{:d} = {:.3f}".format(i, mean_durs[i]*1000))
