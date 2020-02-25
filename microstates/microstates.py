@@ -260,6 +260,3 @@ def _corr_vectors(A, B, axis=0):
     An /= np.linalg.norm(An, axis=axis)
     Bn /= np.linalg.norm(Bn, axis=axis)
     return np.sum(An * Bn, axis=axis)
-
-maps, segmentation, gev, gfp_peaks = segment(
-    epochs.get_data(), n_states, n_inits)
