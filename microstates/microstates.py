@@ -133,6 +133,10 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         chosen_peaks = random_state.choice(n_peaks, size=max_n_peaks,
                                            replace=False)
         peaks = peaks[chosen_peaks]
+    
+    # Taking the data only at the GFP peaks and recalculating the GFP    
+    data_peaks = data[:, chosen_peaks]
+    gfp = np.mean(data ** 2, axis=0)
 
     # Cache this value for later
     gfp_sum_sq = np.sum(gfp ** 2)
@@ -143,7 +147,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     best_maps = None
     best_segmentation = None
     for _ in range(n_inits):
-        maps, segmentation = _mod_kmeans(data, n_states, n_inits, max_iter,
+        maps, segmentation = _mod_kmeans(data, data_peaks, n_states, n_inits, max_iter,
                                          thresh, random_state, verbose)
         map_corr = _corr_vectors(data, maps[segmentation].T)
 
@@ -158,29 +162,35 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
 
 
 @verbose
-def _mod_kmeans(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
+def _mod_kmeans(data, data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                 random_state=None, verbose=None):
     """The modified K-means clustering algorithm.
 
     See :func:`segment` for the meaning of the parameters and return
     values.
+    
+    Parameters
+    ----------
+    data_peaks : ndarray, shape (n_channels, n_samples)
+        The data to find the microstates in - selected from the original data
+            at the chosen_peaks. 
     """
     if not isinstance(random_state, np.random.RandomState):
         random_state = np.random.RandomState(random_state)
-    n_channels, n_samples = data.shape
+    n_channels, n_samples = data_peaks.shape
 
     # Cache this value for later
-    data_sum_sq = np.sum(data ** 2)
+    data_sum_sq = np.sum(data_peaks ** 2)
 
     # Select random timepoints for our initial topographic maps
     init_times = random_state.choice(n_samples, size=n_states, replace=False)
-    maps = data[:, init_times].T
+    maps = data_peaks[:, init_times].T
     maps /= np.linalg.norm(maps, axis=1, keepdims=True)  # Normalize the maps
 
     prev_residual = np.inf
     for iteration in range(max_iter):
         # Assign each sample to the best matching microstate
-        activation = maps.dot(data)
+        activation = maps.dot(data_peaks)
         segmentation = np.argmax(np.abs(activation), axis=0)
         # assigned_activations = np.choose(segmentations, all_activations)
 
@@ -197,11 +207,11 @@ def _mod_kmeans(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             # cov = data[:, idx].dot(data[:, idx].T)
             # _, vec = eigh(cov, eigvals=(n_channels - 1, n_channels - 1))
             # maps[state] = vec.ravel()
-            maps[state] = data[:, idx].dot(activation[state, idx])
+            maps[state] = data_peaks[:, idx].dot(activation[state, idx])
             maps[state] /= np.linalg.norm(maps[state])
 
         # Estimate residual noise
-        act_sum_sq = np.sum(np.sum(maps[segmentation].T * data, axis=0) ** 2)
+        act_sum_sq = np.sum(np.sum(maps[segmentation].T * data_peaks, axis=0) ** 2)
         residual = abs(data_sum_sq - act_sum_sq)
         residual /= float(n_samples * (n_channels - 1))
 
@@ -214,7 +224,7 @@ def _mod_kmeans(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     else:
         warnings.warn('Modified K-means algorithm failed to converge.')
 
-    # Compute final microstate segmentations
+    # Compute final microstate segmentations on the original data
     activation = maps.dot(data)
     segmentation = np.argmax(activation ** 2, axis=0)
 
@@ -251,3 +261,5 @@ def _corr_vectors(A, B, axis=0):
     Bn /= np.linalg.norm(Bn, axis=axis)
     return np.sum(An * Bn, axis=axis)
 
+maps, segmentation, gev, gfp_peaks = segment(
+    epochs.get_data(), n_states, n_inits)
