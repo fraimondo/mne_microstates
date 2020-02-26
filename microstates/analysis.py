@@ -9,7 +9,7 @@ Microstates analysis functions
 """
 import numpy as np
 
-def p_empirical(segmentation, n_states=4):
+def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=False):
     """Empirical symbol distribution
     Or in other words of Michel2018, Segment Count Density:
         the fraction of total recording time for which a given microstate
@@ -17,18 +17,46 @@ def p_empirical(segmentation, n_states=4):
 
     Args:
         segmentation : ndarray, shape (n_samples,)
-        For each sample, the index of the microstate to which the sample has
-        been assigned.
-        n_states: number of microstate clusters
+            For each sample, the index of the microstate to which the sample has
+            been assigned.
+        n_states : int
+            The number of unique microstates to find. Defaults to 4.
+        epoched_data : bool
+            If True it means the segmentation was done on epoched data. 
+            The transitions between the last microstate of epoch n and the first 
+            microstate of epoch n+1, should not be taken into consideration. 
+            Defaults to False.
+        n_epochs : int
+            The number of epochs of the segmented file.
+        n_samples : int
+            The number of samples in an epoch. 
+        
     Returns:
-        p: empirical distribution
+        p : ndarray, (n_states,)
+            Empirical distribution
     """
-    p = np.zeros(n_states)
-    n = len(segmentation)
-    for i in range(n):
-        p[segmentation[i]] += 1.0
-    p /= n
-    return p
+    
+    if epoched_data == True:
+        all_p = []
+        p = np.zeros(n_states)
+        n = len(segmentation)
+        for i in range(n_epochs):
+            for j in range(n_samples):
+                p[segmentation[(n_samples*i)+(j)]] += 1.0
+            p /= n # dividing by n here and not by n_samples for value accuracy
+            all_p.append(p)
+        all_p = np.vstack(all_p)
+        # sums the probabilities across all epochs
+        all_p_sum = np.sum(all_p, axis=0)
+        return all_p_sum
+    
+    if epoched_data == False:
+        p = np.zeros(n_states)
+        n = len(segmentation)
+        for i in range(n):
+            p[segmentation[i]] += 1.0
+        p /= n
+        return p
 
 def mean_dur(segmentation, sfreq, n_states=4):
     """Mean duration of segments
@@ -36,8 +64,8 @@ def mean_dur(segmentation, sfreq, n_states=4):
 
     Args:
         segmentation : ndarray, shape (n_samples,)
-        For each sample, the index of the microstate to which the sample has
-        been assigned.
+            For each sample, the index of the microstate to which the sample has
+            been assigned.
         sfreq : sampling frequency 
         n_states: number of microstate clusters
     Returns:

@@ -61,10 +61,13 @@ mst.viz.plot_segmentation(
 
 #================ Analyses ================#
 # p_empirical 
-p_hat = mst.analysis.p_empirical(segmentation, n_states)
+epoched_data = True
+n_epochs, n_chans, n_samples = epochs.get_data().shape
+p_hat = mst.analysis.p_empirical(segmentation, n_epochs, n_samples, n_states, 
+                                 epoched_data)
 print("\n\t\tEmpirical symbol distribution (RTT):\n")
 for i in range(n_states): 
-    print("\t\tp_{:d} = {:.3f}".format(i, p_hat[i]))
+    print("\n\t\t p", i, " = {0:.5f}".format(p_hat[i]))
 
 # T_empirical
 T_hat = mst.analysis.T_empirical(segmentation, n_states)
