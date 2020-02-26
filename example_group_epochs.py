@@ -47,17 +47,29 @@ for i, f in enumerate(subj_folder):
 grouped_maps_T = grouped_maps.transpose()
 
 # Find the group maps using k-means clustering
-group_maps, _, group_gev = mst.groupsegment(grouped_maps_T, n_states, n_inits)
+group_maps, _, group_gev = mst.segment(grouped_maps_T, n_states, n_inits, use_peaks=False)
 
-for i, subj in enumerate(subj_folder):
+# Fitting the maps back to the original epoched data by subject 
+grouped_segment = []
+for i, f in enumerate(subj_folder):
     fname = HC_RS_path + f + '/' + f +'_clean-epo.fif'
     epochs = mne.read_epochs(fname, preload=True)
     if EGI256 == True:
         epochs.drop_channels(chan_to_drop)
     data = epochs.get_data()
+    n_epochs, n_chans, n_samples = data.shape
+    # Make the data 2D
+    data = np.hstack(data)
     # Compute final microstate segmentations on the original data
     activation = group_maps.dot(data)
     segmentation = np.argmax(activation ** 2, axis=0)
+    # Add all the per subject segmentations in one array
+    # (n_times, subjects)
+    grouped_segment.append(segmentation)
+    # Plot the segmentation per subject
+    sfreq = epochs.info['sfreq']
+    times = np.arange(0, len(data[1])/sfreq, 1/sfreq)
+    mst.viz.plot_segmentation(segmentation[:500], data[:, :500], times[:500])
 
 # Plot the maps
 mst.viz.plot_maps(group_maps, epochs.info)

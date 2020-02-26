@@ -20,7 +20,7 @@ from mne.utils import logger, verbose
 @verbose
 def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             normalize=False, min_peak_dist=2, max_n_peaks=10000,
-            random_state=None, verbose=None):
+            random_state=None, verbose=None, use_peaks=True):
     """Segment a continuous signal into microstates.
 
     Peaks in the global field power (GFP) are used to find microstates, using a
@@ -79,64 +79,66 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     """
     logger.info('Finding %d microstates, using %d random intitializations' %
                 (n_states, n_inits))
-
-    if len(data.shape) == 3:
-        epo_data = True
-        logger.info('Finding microstates from epoched data.')
-        n_epochs, n_chans, n_samples = data.shape
-        # Make 2D and keep events info
-        data = np.hstack(data)
-#        events = np.arange(0, data.shape[1], n_samples)
-    else:
-        epo_data = False
-
+    
     if normalize:
         data = zscore(data, axis=1)
 
+    if use_peaks == True: 
+        if len(data.shape) == 3:
+            epo_data = True
+            logger.info('Finding microstates from epoched data.')
+            n_epochs, n_chans, n_samples = data.shape
+            # Make 2D and keep events info
+            data = np.hstack(data)
+    #        events = np.arange(0, data.shape[1], n_samples)
+        else:
+            epo_data = False
 
     # Find peaks in the global field power (GFP)
-    gfp = np.mean(data ** 2, axis=0)
-    peaks, _ = find_peaks(gfp, distance=min_peak_dist)
+    gfp = np.mean(data ** 2, axis=0)    
     
-    if epo_data == True:
-        # Filter peaks that are too close to an event
-        len_epoch = n_samples
-        index_removal = []  
-        # Then we iterate through the peaks, and we discart the last peaks before 
-        # the epoch borders, and the first peaks after the epoch borders. 
-        for n in range(n_epochs-1):
-            #print("Epoch number:", n)
-            epo_end = len_epoch * (n+1)
-            epo_end_dist_neg = epo_end - (min_peak_dist-1)
-            epo_end_dist_pos = epo_end + min_peak_dist
-            for i in range(epo_end_dist_neg, epo_end_dist_pos):
-                if i in peaks:
-                    peak = np.where(peaks == i) # finds the indice of a value
-                    index_removal.extend(peak)
-        
-        # Remove the peaks around the ends of the epochs
-        peaks = np.delete(peaks, index_removal)
-        
-        # At the end we remove the first peak of the first epoch
-        # and the last peak of the last epoch.
-        peaks = np.delete(peaks, 0)
-        peaks = np.delete(peaks, -1)
-        #print("Done with the peaks cleaning.")
-        
-    n_peaks = len(peaks)
+    if use_peaks == True: 
+        # Find the peaks in the GFP
+        peaks, _ = find_peaks(gfp, distance=min_peak_dist)
+        if epo_data == True:
+            # Filter peaks that are too close to an event
+            len_epoch = n_samples
+            index_removal = []  
+            # Then we iterate through the peaks, and we discart the last peaks before 
+            # the epoch borders, and the first peaks after the epoch borders. 
+            for n in range(n_epochs-1):
+                #print("Epoch number:", n)
+                epo_end = len_epoch * (n+1)
+                epo_end_dist_neg = epo_end - (min_peak_dist-1)
+                epo_end_dist_pos = epo_end + min_peak_dist
+                for i in range(epo_end_dist_neg, epo_end_dist_pos):
+                    if i in peaks:
+                        peak = np.where(peaks == i) # finds the indice of a value
+                        index_removal.extend(peak)
+            
+            # Remove the peaks around the ends of the epochs
+            peaks = np.delete(peaks, index_removal)
+            
+            # At the end we remove the first peak of the first epoch
+            # and the last peak of the last epoch.
+            peaks = np.delete(peaks, 0)
+            peaks = np.delete(peaks, -1)
+            #print("Done with the peaks cleaning.")
+            
+        n_peaks = len(peaks)
 
-    # Limit the number of peaks by randomly selecting them
-    if max_n_peaks is not None:
-        max_n_peaks = min(n_peaks, max_n_peaks)
-        if not isinstance(random_state, np.random.RandomState):
-            random_state = np.random.RandomState(random_state)
-        chosen_peaks = random_state.choice(n_peaks, size=max_n_peaks,
-                                           replace=False)
-        peaks = peaks[chosen_peaks]
-    
-    # Taking the data only at the GFP peaks and recalculating the GFP    
-    data_peaks = data[:, chosen_peaks]
-    gfp = np.mean(data ** 2, axis=0)
+        # Limit the number of peaks by randomly selecting them
+        if max_n_peaks is not None:
+            max_n_peaks = min(n_peaks, max_n_peaks)
+            if not isinstance(random_state, np.random.RandomState):
+                random_state = np.random.RandomState(random_state)
+            chosen_peaks = random_state.choice(n_peaks, size=max_n_peaks,
+                                               replace=False)
+            peaks = peaks[chosen_peaks]
+        
+        # Taking the data only at the GFP peaks and recalculating the GFP    
+        data_peaks = data[:, chosen_peaks]
+        gfp = np.mean(data ** 2, axis=0)
 
     # Cache this value for later
     gfp_sum_sq = np.sum(gfp ** 2)
@@ -146,6 +148,10 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     best_gev = 0
     best_maps = None
     best_segmentation = None
+    
+    if use_peaks == False:
+        data_peaks = data
+
     for _ in range(n_inits):
         maps, segmentation = _mod_kmeans(data, data_peaks, n_states, n_inits, max_iter,
                                          thresh, random_state, verbose)
@@ -157,48 +163,50 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         logger.info('GEV of found microstates: %f' % gev)
         if gev > best_gev:
             best_gev, best_maps, best_segmentation = gev, maps, segmentation
+    
+    if use_peaks == True:
+        return best_maps, best_segmentation, best_gev, peaks
+    elif use_peaks == False:
+        return best_maps, best_segmentation, best_gev
 
-    return best_maps, best_segmentation, best_gev, peaks
-
-
-@verbose
-def groupsegment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
-            normalize=False, min_peak_dist=2, max_n_peaks=10000,
-            random_state=None, verbose=None):
-    """Segment a continuous signal into microstates.
-
-    """
-    logger.info('Finding %d microstates, using %d random intitializations' %
-                (n_states, n_inits))
-
-    if normalize:
-        data = zscore(data, axis=1)
-
-    # Find peaks in the global field power (GFP)
-    gfp = np.mean(data ** 2, axis=0)
-
-    # Cache this value for later
-    gfp_sum_sq = np.sum(gfp ** 2)
-
-    # Do several runs of the k-means algorithm, keep track of the best
-    # segmentation.
-    best_gev = 0
-    best_maps = None
-    best_segmentation = None
-    data_peaks = data
-    for _ in range(n_inits):
-        maps, segmentation = _mod_kmeans(data, data_peaks, n_states, n_inits, max_iter,
-                                         thresh, random_state, verbose)
-        map_corr = _corr_vectors(data, maps[segmentation].T)
-
-        # Compare across iterations using global explained variance (GEV) of
-        # the found microstates.
-        gev = sum((gfp * map_corr) ** 2) / gfp_sum_sq
-        logger.info('GEV of found microstates: %f' % gev)
-        if gev > best_gev:
-            best_gev, best_maps, best_segmentation = gev, maps, segmentation
-
-    return best_maps, best_segmentation, best_gev
+#@verbose
+#def groupsegment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
+#            normalize=False, min_peak_dist=2, max_n_peaks=10000,
+#            random_state=None, verbose=None):
+#    """Segment a continuous signal into microstates.
+#
+#    """
+#    logger.info('Finding %d microstates, using %d random intitializations' %
+#                (n_states, n_inits))
+#
+#    if normalize:
+#        data = zscore(data, axis=1)
+#
+#    # Find peaks in the global field power (GFP)
+#    gfp = np.mean(data ** 2, axis=0)
+#
+#    # Cache this value for later
+#    gfp_sum_sq = np.sum(gfp ** 2)
+#
+#    # Do several runs of the k-means algorithm, keep track of the best
+#    # segmentation.
+#    best_gev = 0
+#    best_maps = None
+#    best_segmentation = None
+#    data_peaks = data
+#    for _ in range(n_inits):
+#        maps, segmentation = _mod_kmeans(data, data_peaks, n_states, n_inits, max_iter,
+#                                         thresh, random_state, verbose)
+#        map_corr = _corr_vectors(data, maps[segmentation].T)
+#
+#        # Compare across iterations using global explained variance (GEV) of
+#        # the found microstates.
+#        gev = sum((gfp * map_corr) ** 2) / gfp_sum_sq
+#        logger.info('GEV of found microstates: %f' % gev)
+#        if gev > best_gev:
+#            best_gev, best_maps, best_segmentation = gev, maps, segmentation
+#
+#    return best_maps, best_segmentation, best_gev
 
 @verbose
 def _mod_kmeans(data, data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
