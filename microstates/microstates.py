@@ -169,45 +169,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     elif use_peaks == False:
         return best_maps, best_segmentation, best_gev
 
-#@verbose
-#def groupsegment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
-#            normalize=False, min_peak_dist=2, max_n_peaks=10000,
-#            random_state=None, verbose=None):
-#    """Segment a continuous signal into microstates.
-#
-#    """
-#    logger.info('Finding %d microstates, using %d random intitializations' %
-#                (n_states, n_inits))
-#
-#    if normalize:
-#        data = zscore(data, axis=1)
-#
-#    # Find peaks in the global field power (GFP)
-#    gfp = np.mean(data ** 2, axis=0)
-#
-#    # Cache this value for later
-#    gfp_sum_sq = np.sum(gfp ** 2)
-#
-#    # Do several runs of the k-means algorithm, keep track of the best
-#    # segmentation.
-#    best_gev = 0
-#    best_maps = None
-#    best_segmentation = None
-#    data_peaks = data
-#    for _ in range(n_inits):
-#        maps, segmentation = _mod_kmeans(data, data_peaks, n_states, n_inits, max_iter,
-#                                         thresh, random_state, verbose)
-#        map_corr = _corr_vectors(data, maps[segmentation].T)
-#
-#        # Compare across iterations using global explained variance (GEV) of
-#        # the found microstates.
-#        gev = sum((gfp * map_corr) ** 2) / gfp_sum_sq
-#        logger.info('GEV of found microstates: %f' % gev)
-#        if gev > best_gev:
-#            best_gev, best_maps, best_segmentation = gev, maps, segmentation
-#
-#    return best_maps, best_segmentation, best_gev
-
 @verbose
 def _mod_kmeans(data, data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                 random_state=None, verbose=None):
