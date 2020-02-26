@@ -50,9 +50,9 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         k-means algorithm. Defaults to ``False``.
     min_peak_dist : int
         Minimum distance (in samples) between peaks in the GFP. Defaults to 2.
-    max_n_peaks : int
+    max_n_peaks : int | None
         Maximum number of GFP peaks to use in the k-means algorithm. Chosen
-        randomly. Defaults to 10000.
+        randomly. Set to ``None`` to use all data. Defaults to 10000.
     random_state : int | numpy.random.RandomState | None
         The seed or ``RandomState`` for the random number generator. Defaults
         to ``None``, in which case a different seed is chosen each time this
@@ -61,7 +61,8 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         Controls the verbosity.
     use_peaks : bool
         Whether to find the GFP peaks or not. True if finding maps per subject,
-        False if finding maps for a group of subjects.
+        False if finding maps for a group of subjects - in this case we don't 
+        need the segmentation.  
 
     Returns
     -------
@@ -140,7 +141,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             peaks = peaks[chosen_peaks]
         
         # Taking the data only at the GFP peaks and recalculating the GFP    
-        data_peaks = data[:, chosen_peaks]
+        data_peaks = data[:, peaks]
         gfp = np.mean(data ** 2, axis=0)
 
     # Cache this value for later
@@ -158,6 +159,9 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     for _ in range(n_inits):
         maps, segmentation = _mod_kmeans(data, data_peaks, n_states, n_inits, max_iter,
                                          thresh, random_state, verbose)
+        if use_peaks == False:
+            activation = maps.dot(data)
+            segmentation = np.argmax(activation ** 2, axis=0)
         map_corr = _corr_vectors(data, maps[segmentation].T)
 
         # Compare across iterations using global explained variance (GEV) of
@@ -235,11 +239,7 @@ def _mod_kmeans(data, data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=
     else:
         warnings.warn('Modified K-means algorithm failed to converge.')
 
-    # Compute final microstate segmentations on the original data
-    activation = maps.dot(data)
-    segmentation = np.argmax(activation ** 2, axis=0)
-
-    return maps, segmentation
+    return maps
 
 
 def _corr_vectors(A, B, axis=0):
