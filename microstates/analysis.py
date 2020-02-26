@@ -32,7 +32,7 @@ def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=Fals
             The number of samples in an epoch. 
         
     Returns:
-        p : ndarray, (n_states,)
+        p  : ndarray, (n_states,)
             Empirical distribution
     """
     
@@ -48,15 +48,16 @@ def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=Fals
         all_p = np.vstack(all_p)
         # sums the probabilities across all epochs
         all_p_sum = np.sum(all_p, axis=0)
-        return all_p_sum
-    
-    if epoched_data == False:
+        p = all_p_sum
+        
+    elif epoched_data == False:
         p = np.zeros(n_states)
         n = len(segmentation)
         for i in range(n):
             p[segmentation[i]] += 1.0
         p /= n
-        return p
+    
+    return p
 
 def mean_dur(segmentation, sfreq, n_states=4):
     """Mean duration of segments
