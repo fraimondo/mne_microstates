@@ -59,6 +59,9 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         function is called.
     verbose : int | bool | None
         Controls the verbosity.
+    use_peaks : bool
+        Whether to find the GFP peaks or not. True if finding maps per subject,
+        False if finding maps for a group of subjects.
 
     Returns
     -------
