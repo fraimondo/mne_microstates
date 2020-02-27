@@ -67,8 +67,10 @@ def mean_dur(segmentation, sfreq, n_states=4):
         segmentation : ndarray, shape (n_samples,)
             For each sample, the index of the microstate to which the sample has
             been assigned.
-        sfreq : sampling frequency 
-        n_states: number of microstate clusters
+        sfreq : float
+            Sampling frequency of the signal. 
+        n_states : int
+            The number of unique microstates to find. Defaults to 4.
     Returns:
         mean_durs : ndarray, shape (n_states,)
             the mean durations per state in seconds
@@ -91,9 +93,10 @@ def T_empirical(segmentation, n_states):
 
     Args:
         segmentation : ndarray, shape (n_samples,)
-        For each sample, the index of the microstate to which the sample has
-        been assigned.
-        n_states: number of microstate clusters
+            For each sample, the index of the microstate to which the sample has
+            been assigned.
+        n_states : int
+            The number of unique microstates to find. Defaults to 4.
     Returns:
         T: empirical transition matrix
     """
