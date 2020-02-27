@@ -50,8 +50,8 @@ if EGI256 == True:
                           'E219', 'E225', 'E226', 'E230', 'E234', 'E238'])
 
 # Segment the data in microstates
-maps, segmentation, gev, gfp_peaks = mst.segment(epochs.get_data(), n_states, 
-                                                 n_inits)
+maps, segmentation, gev, gfp_peaks = mst.segment(
+        epochs.get_data(), n_states, n_inits)
 
 # Plot the topographic maps of the microstates and the segmentation
 mst.viz.plot_maps(maps, epochs.info)

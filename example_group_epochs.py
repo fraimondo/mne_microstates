@@ -25,7 +25,7 @@ chan_to_drop = ['E67',  'E73',  'E247', 'E251', 'E256', 'E243', 'E246', 'E250',
 
 pax = len(subj_folder) # number of participants
 n_states = 4
-n_inits = 1
+n_inits = 10
 EGI256 = True
 
 if EGI256 == True:
@@ -47,7 +47,7 @@ for i, f in enumerate(subj_folder):
 grouped_maps_T = grouped_maps.transpose()
 
 # Find the group maps using k-means clustering
-group_maps, _, group_gev = mst.segment(grouped_maps_T, n_states, n_inits, use_peaks=False)
+group_maps, group_gev = mst.segment(grouped_maps_T, n_states, n_inits, use_peaks=False)
 
 # Fitting the maps back to the original epoched data by subject 
 grouped_segment = []

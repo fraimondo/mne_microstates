@@ -111,7 +111,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             # Then we iterate through the peaks, and we discart the last peaks before 
             # the epoch borders, and the first peaks after the epoch borders. 
             for n in range(n_epochs-1):
-                #print("Epoch number:", n)
                 epo_end = len_epoch * (n+1)
                 epo_end_dist_neg = epo_end - (min_peak_dist-1)
                 epo_end_dist_pos = epo_end + min_peak_dist
@@ -127,7 +126,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             # and the last peak of the last epoch.
             peaks = np.delete(peaks, 0)
             peaks = np.delete(peaks, -1)
-            #print("Done with the peaks cleaning.")
             
         n_peaks = len(peaks)
 
@@ -155,28 +153,26 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     
     if use_peaks == False:
         data_peaks = data
-    
 
     for _ in range(n_inits):
         maps = _mod_kmeans(data_peaks, n_states, n_inits, max_iter, 
                            thresh, random_state, verbose)
         
-        if use_peaks == True:
-            activation = maps.dot(data_peaks)
-            segmentation = np.argmax(activation ** 2, axis=0)
-            map_corr = _corr_vectors(data_peaks, maps[segmentation].T)
+        activation = maps.dot(data)
+        segmentation = np.argmax(activation ** 2, axis=0)
+        map_corr = _corr_vectors(data, maps[segmentation].T)
 
-            # Compare across iterations using global explained variance (GEV) of
-            # the found microstates.
-            gev = sum((gfp * map_corr) ** 2) / gfp_sum_sq
-            logger.info('GEV of found microstates: %f' % gev)
-            if gev > best_gev:
-                best_gev, best_maps, best_segmentation = gev, maps, segmentation
+        # Compare across iterations using global explained variance (GEV) of
+        # the found microstates.
+        gev = sum((gfp * map_corr) ** 2) / gfp_sum_sq
+        logger.info('GEV of found microstates: %f' % gev)
+        if gev > best_gev:
+            best_gev, best_maps, best_segmentation = gev, maps, segmentation
     
     if use_peaks == True:
         return best_maps, best_segmentation, best_gev, peaks
     elif use_peaks == False:
-        return best_maps
+        return best_maps, best_gev
 
 @verbose
 def _mod_kmeans(data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
