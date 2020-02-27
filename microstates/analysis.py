@@ -19,6 +19,10 @@ def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=Fals
         segmentation : ndarray, shape (n_samples,)
             For each sample, the index of the microstate to which the sample has
             been assigned.
+        n_epochs : int
+            The number of epochs of the segmented file.
+        n_samples : int
+            The number of samples in an epoch.
         n_states : int
             The number of unique microstates to find. Defaults to 4.
         epoched_data : bool
@@ -26,10 +30,6 @@ def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=Fals
             The transitions between the last microstate of epoch n and the first 
             microstate of epoch n+1, should not be taken into consideration. 
             Defaults to False.
-        n_epochs : int
-            The number of epochs of the segmented file.
-        n_samples : int
-            The number of samples in an epoch. 
         
     Returns:
         p  : ndarray, (n_states,)

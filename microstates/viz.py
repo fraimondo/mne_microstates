@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 import mne
 
-def plot_segmentation(segmentation, data, times):
+def plot_segmentation(segmentation, data, times, n_states=4):
     """Plot a microstate segmentation.
 
     Parameters
@@ -17,10 +17,15 @@ def plot_segmentation(segmentation, data, times):
         been assigned.
     times : list of float
         The time-stamp for each sample.
+    n_states : int
+        The number of unique microstates to find. Defaults to 4.
     """
     gfp = np.mean(data ** 2, axis=0)
-
-    n_states = len(np.unique(segmentation))
+    
+#    n_states = len(np.unique(segmentation))
+    # Removed because for the group clustering it's a problem
+    # as all the states might not appear in all subjects. 
+    
     plt.figure(figsize=(6 * np.ptp(times), 2))
     cmap = plt.cm.get_cmap('plasma', n_states)
     plt.plot(times, gfp, color='black', linewidth=1)

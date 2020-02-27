@@ -49,8 +49,11 @@ grouped_maps_T = grouped_maps.transpose()
 # Find the group maps using k-means clustering
 group_maps, group_gev = mst.segment(grouped_maps_T, n_states, n_inits, use_peaks=False)
 
+# Plot the maps
+mst.viz.plot_maps(group_maps, epochs.info)
+
 # Fitting the maps back to the original epoched data by subject 
-grouped_segment = []
+grouped_segment, all_p = [], []
 for i, f in enumerate(subj_folder):
     fname = HC_RS_path + f + '/' + f +'_clean-epo.fif'
     epochs = mne.read_epochs(fname, preload=True)
@@ -70,6 +73,24 @@ for i, f in enumerate(subj_folder):
     sfreq = epochs.info['sfreq']
     times = np.arange(0, len(data[1])/sfreq, 1/sfreq)
     mst.viz.plot_segmentation(segmentation[:500], data[:, :500], times[:500])
+    
+    # p_empirical 
+    epoched_data = True
+    p_hat = mst.analysis.p_empirical(segmentation, n_epochs, n_samples, n_states, 
+                                     epoched_data)
+    all_p.append(p_hat)
 
-# Plot the maps
-mst.viz.plot_maps(group_maps, epochs.info)
+# p_empirical printing
+print("\n\t Empirical symbol distribution (RTT) per subject:\n")
+for i in range(pax):
+    print("\n Subject", i)
+    for j in range(n_states): 
+        print("\n\t\t p", j, " = {0:.5f}".format(all_p[i][j]))
+        
+all_p = np.vstack(all_p)
+all_p /= pax
+all_p_sum = np.sum(all_p, axis=0)
+
+print("\n\t Empirical symbol distribution (RTT) for all subjects:\n")
+for i in range(n_states): 
+    print("\n\t\t p", i, " = {0:.5f}".format(all_p_sum[i]))
