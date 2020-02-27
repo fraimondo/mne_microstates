@@ -162,9 +162,9 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                            thresh, random_state, verbose)
         
         if use_peaks == True:
-            activation = maps.dot(data)
+            activation = maps.dot(data_peaks)
             segmentation = np.argmax(activation ** 2, axis=0)
-            map_corr = _corr_vectors(data, maps[segmentation].T)
+            map_corr = _corr_vectors(data_peaks, maps[segmentation].T)
 
             # Compare across iterations using global explained variance (GEV) of
             # the found microstates.
