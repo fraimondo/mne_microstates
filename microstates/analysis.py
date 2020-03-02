@@ -74,19 +74,27 @@ def mean_dur(segmentation, sfreq, n_states=4):
     Returns:
         mean_durs : ndarray, shape (n_states,)
             the mean durations per state in seconds
+        all_durs : list of lists
+            Contains all the durations of each microstate. 
     """
+    import matplotlib.pyplot as plt
+    
     durs = np.zeros((int(n_states), 2)) 
     n = len(segmentation)
     dur = 0
+    all_durs = [[] for i in range(n_states)]
     for i in range(n):
         dur += 1
         if i == (n-1) or (segmentation[i+1] != segmentation[i]):
             durs[segmentation[i]][0] += dur
             durs[segmentation[i]][1] += 1
-            dur = 0 
+            all_durs[segmentation[i]].append(dur)
+            dur = 0
+
     mean_durs = durs[:, 0] / durs[:, 1]
-    mean_durs /= sfreq
-    return mean_durs
+    mean_durs /= sfreq # we get the mean_durs in seconds
+    
+    return mean_durs, all_durs
 
 def T_empirical(segmentation, n_states):
     """Empirical transition matrix

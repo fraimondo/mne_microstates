@@ -87,7 +87,13 @@ print("\n\t\tGlobal explained variance (GEV):")
 print ("\t\t" + str(gev))
 
 # Mean durations of states 
-mean_durs = mst.analysis.mean_dur(segmentation, sfreq, n_states)
+mean_durs, all_durs = mst.analysis.mean_dur(segmentation, sfreq, n_states)
 print("\n\t\t Mean microstate durations in ms:\n")
 for i in range(n_states): 
     print("\t\tp_{:d} = {:.3f}".format(i, mean_durs[i]*1000))
+# Histograms of mean durations
+for i in range(n_states):
+    # durations in ms
+    all_dur = [(j/250)*1000 for j in all_durs[i]]
+    plt.figure()
+    plt.hist(all_dur)
