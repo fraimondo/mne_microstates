@@ -89,29 +89,34 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
 
     if use_peaks == True: 
         if len(data.shape) == 3:
-            epo_data = True
             logger.info('Finding microstates from epoched data.')
             n_epochs, n_chans, n_samples = data.shape
             # Make 2D and keep events info
             data = np.hstack(data)
-    #        events = np.arange(0, data.shape[1], n_samples)
-        else:
-            epo_data = False
+            # events = np.arange(0, data.shape[1], n_samples)
 
     # Find peaks in the global field power (GFP)
-    gfp = np.mean(data ** 2, axis=0)    
+    gfp = np.mean(data ** 2, axis=0)   
+    
+    # Remove the GFP values above a limit 
+    # in this case 1 standard deviation above the mean. 
+    # Suggested by Poulsen et al. 2018
+    gfp_std = np.std(gfp)
+    gfp_mean = np.mean(gfp)
+    gfp_std_limit = gfp_mean + gfp_std
+    gfp = [i for i in gfp if i < gfp_std_limit]
+    
+    # Remove the lower 15% of the GFP distribution.
+    # Suggested by Mishra et al. 2020 (X. Cohen)
+    gfp_sorted = np.sort(gfp)
+    # Find the value of the lower 15 % of the distribution
+    gfp_percent_limit = gfp_sorted[round(len(gfp) * 0.15) + 1]
+    gfp = [i for i in gfp if i > gfp_percent_limit]
     
     if use_peaks == True: 
         # Find the peaks in the GFP
-        peaks, _ = find_peaks(gfp, distance=min_peak_dist)
-
-        ######################################################################
-        # Add a part that removed the lower 15% of peaks.    
-    
-        ######################################################################
-    
+        peaks, _ = find_peaks(gfp, distance=min_peak_dist)        
         n_peaks = len(peaks)
-    
         # Limit the number of peaks by randomly selecting them
         if max_n_peaks is not None:
             max_n_peaks = min(n_peaks, max_n_peaks)
@@ -121,9 +126,10 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                                                replace=False)
             peaks = peaks[chosen_peaks]
         
+        
         # Taking the data only at the GFP peaks and recalculating the GFP    
         data_peaks = data[:, peaks]
-        gfp = np.mean(data ** 2, axis=0)
+        gfp = np.mean(data_peaks ** 2, axis=0)
         # Shouldn't it be this?
         #        gfp_hm = np.std(data, axis=0)
 
@@ -145,16 +151,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         
         activation = maps.dot(data)
         segmentation = np.argmax(activation ** 2, axis=0)
-        ######################################################################
-        # Here add a part in which you select the microstates around a border, 
-        # and you remove those indices in the segmentation
-        # but also in the data. 
-        
-        # Or maybe not, maybe we can just remove them before doing the analyses.
-        # The way p_empirical() is calculated now for the epoched data is alligned
-        # with this. 
-        
-        ######################################################################
         map_corr = _corr_vectors(data, maps[segmentation].T)
 #        limmap = [i for i in map_corr if i > 0.5 or i < -0.5]
 
@@ -199,28 +195,23 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
     
     """
     seg_new = segmentation
-    
     for i in range(n_epochs):
-                
+        
+        first_mst = seg_new[n_samples*i]
+        seg_new[n_samples*i] = 88
         for j in range(n_samples):
-            if j == 0:
-                first_mst = seg_new[n_samples*i]
-                seg_new[n_samples*i] = 88
+            if seg_new[(n_samples*i)+j] == first_mst:
+                seg_new[(n_samples*i)+j] = 88
             else:
-                if seg_new[(n_samples*i)+j] == first_mst:
-                    seg_new[(n_samples*i)+j] = 88
-                else:
-                    break 
-                
-        for j in range(n_samples):
-            if j == 0:
-                last_mst = seg_new[n_samples*(i+1) - 1]
-                seg_new[n_samples*(i+1) - 1] = 88
+                break 
+        
+        last_mst = seg_new[n_samples*(i+1) - 1]
+        seg_new[n_samples*(i+1) - 1] = 88      
+        for j in range(1:n_samples):
+            if seg_new[n_samples*(i+1) - (j+1)] == last_mst:
+                seg_new[n_samples*(i+1) - (j+1)] = 88
             else:
-                if seg_new[n_samples*(i+1) - (j+1)] == last_mst:
-                    seg_new[n_samples*(i+1) - (j+1)] = 88
-                else:
-                    break
+                break
     return seg_new
 
 @verbose

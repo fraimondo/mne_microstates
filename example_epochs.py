@@ -53,7 +53,7 @@ if EGI256 == True:
 
 # Segment the data in microstates
 maps, segmentation, gev, gfp_peaks = mst.segment(
-        epochs.get_data(), n_states, n_inits, min_peak_dist=10)
+        epochs.get_data(), n_states, n_inits, min_peak_dist=10, normalize=True)
 
 
 # Mark each epoch at a beginning and at an end of an epoch w/ the value 88
@@ -129,5 +129,3 @@ plt.grid(True)
 plt.legend(prop={'size': 10})
 plt.xlabel('Duration of mSts in samples')
 plt.ylabel('Number of mSts')
-
-
