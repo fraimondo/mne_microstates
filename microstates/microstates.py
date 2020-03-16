@@ -104,31 +104,14 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     if use_peaks == True: 
         # Find the peaks in the GFP
         peaks, _ = find_peaks(gfp, distance=min_peak_dist)
-        if epo_data == True:
-            # Filter peaks that are too close to an event
-            len_epoch = n_samples
-            index_removal = []  
-            # Then we iterate through the peaks, and we discart the last peaks before 
-            # the epoch borders, and the first peaks after the epoch borders. 
-            for n in range(n_epochs-1):
-                epo_end = len_epoch * (n+1)
-                epo_end_dist_neg = epo_end - (min_peak_dist-1)
-                epo_end_dist_pos = epo_end + min_peak_dist
-                for i in range(epo_end_dist_neg, epo_end_dist_pos):
-                    if i in peaks:
-                        peak = np.where(peaks == i) # finds the indice of a value
-                        index_removal.extend(peak)
-            
-            # Remove the peaks around the ends of the epochs
-            peaks = np.delete(peaks, index_removal)
-            
-            # At the end we remove the first peak of the first epoch
-            # and the last peak of the last epoch.
-            peaks = np.delete(peaks, 0)
-            peaks = np.delete(peaks, -1)
-            
-        n_peaks = len(peaks)
 
+        ######################################################################
+        # Add a part that removed the lower 15% of peaks.    
+    
+        ######################################################################
+    
+        n_peaks = len(peaks)
+    
         # Limit the number of peaks by randomly selecting them
         if max_n_peaks is not None:
             max_n_peaks = min(n_peaks, max_n_peaks)
@@ -141,9 +124,11 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         # Taking the data only at the GFP peaks and recalculating the GFP    
         data_peaks = data[:, peaks]
         gfp = np.mean(data ** 2, axis=0)
+        # Shouldn't it be this?
+        #        gfp_hm = np.std(data, axis=0)
 
-    # Cache this value for later
-    gfp_sum_sq = np.sum(gfp ** 2)
+        # Cache this value for later
+        gfp_sum_sq = np.sum(gfp ** 2)
 
     # Do several runs of the k-means algorithm, keep track of the best
     # segmentation.
@@ -160,7 +145,18 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         
         activation = maps.dot(data)
         segmentation = np.argmax(activation ** 2, axis=0)
+        ######################################################################
+        # Here add a part in which you select the microstates around a border, 
+        # and you remove those indices in the segmentation
+        # but also in the data. 
+        
+        # Or maybe not, maybe we can just remove them before doing the analyses.
+        # The way p_empirical() is calculated now for the epoched data is alligned
+        # with this. 
+        
+        ######################################################################
         map_corr = _corr_vectors(data, maps[segmentation].T)
+#        limmap = [i for i in map_corr if i > 0.5 or i < -0.5]
 
         # Compare across iterations using global explained variance (GEV) of
         # the found microstates.
@@ -170,9 +166,62 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             best_gev, best_maps, best_segmentation = gev, maps, segmentation
     
     if use_peaks == True:
-        return best_maps, best_segmentation, best_gev, peaks
+        return best_maps, best_segmentation, best_gev, peaks #, map_corr, limmap
     elif use_peaks == False:
         return best_maps, best_gev
+    
+def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
+    """ Marks the microstates surrounding the epoch edges.
+    This is done because when we use epoched data, we cannot know when a 
+    microstate would have ended or would have begun if we hadn't cut the data. 
+    
+    The samples of the segmentation which should not be used are attributed 
+    the value 88. 
+    
+    
+        Parameters
+    ----------
+    segmetation : ndarray, shape (n_samples,)
+        For each sample, the index of the microstate to which the sample has
+        been assigned.
+    n_epochs : int
+        The number of epochs of the segmented file.
+    n_samples : int
+        The number of samples in an epoch.
+    n_states : int
+        The number of unique microstates to find. Defaults to 4.
+ 
+    Returns
+    -------
+    new_seg : ndarray, shape (n_samples,)
+        For each sample, the index of the microstate to which the sample has
+        been assigned.
+    
+    """
+    seg_new = segmentation
+    
+    for i in range(n_epochs):
+                
+        for j in range(n_samples):
+            if j == 0:
+                first_mst = seg_new[n_samples*i]
+                seg_new[n_samples*i] = 88
+            else:
+                if seg_new[(n_samples*i)+j] == first_mst:
+                    seg_new[(n_samples*i)+j] = 88
+                else:
+                    break 
+                
+        for j in range(n_samples):
+            if j == 0:
+                last_mst = seg_new[n_samples*(i+1) - 1]
+                seg_new[n_samples*(i+1) - 1] = 88
+            else:
+                if seg_new[n_samples*(i+1) - (j+1)] == last_mst:
+                    seg_new[n_samples*(i+1) - (j+1)] = 88
+                else:
+                    break
+    return seg_new
 
 @verbose
 def _mod_kmeans(data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,

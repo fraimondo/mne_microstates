@@ -37,6 +37,8 @@ n_states = 4
 n_inits = 5
 EGI256 = False
 sfreq = epochs.info['sfreq']
+n_epochs, n_chans, n_samples = epochs.get_data().shape
+
 
 # Removing channels around the face and neck because of artefacts
 if EGI256 == True:
@@ -51,18 +53,29 @@ if EGI256 == True:
 
 # Segment the data in microstates
 maps, segmentation, gev, gfp_peaks = mst.segment(
-        epochs.get_data(), n_states, n_inits)
+        epochs.get_data(), n_states, n_inits, min_peak_dist=10)
+
+
+# Mark each epoch at a beginning and at an end of an epoch w/ the value 88
+seg_w_borders = mst.mark_border_msts(segmentation, n_states, n_epochs, n_samples) 
+# Remove the values 88 of the segmentation
+seg_wo_borders = segmentation[segmentation != 88]
 
 # Plot the topographic maps of the microstates and the segmentation
 mst.viz.plot_maps(maps, epochs.info)
+# plot the whole segmentation
 mst.viz.plot_segmentation(
-    segmentation[:500], raw.get_data()[:, :500], raw.times[:500])
+    segmentation[:500], np.hstack(epochs.get_data())[:, :500], raw.times[:500])
+# plot the segmentation of a single epoch
+mst.viz.plot_segmentation(
+    segmentation[99*106:100*106], epochs.get_data()[99], epochs.times)
 
 
 #================ Analyses ================#
-# p_empirical 
+# Setup for the analyses and stats
 epoched_data = True
-n_epochs, n_chans, n_samples = epochs.get_data().shape
+
+# p_empirical 
 p_hat = mst.analysis.p_empirical(segmentation, n_epochs, n_samples, n_states, 
                                  epoched_data)
 print("\n\t Empirical symbol distribution (RTT):\n")
@@ -86,14 +99,35 @@ print("\n\t\tGFP peaks per sec.: {:.2f}".format(pps))
 print("\n\t\tGlobal explained variance (GEV):")
 print ("\t\t" + str(gev))
 
-# Mean durations of states 
+#%% Mean durations of states 
 mean_durs, all_durs = mst.analysis.mean_dur(segmentation, sfreq, n_states)
-print("\n\t\t Mean microstate durations in ms:\n")
+print("\n\t Mean microstate durations in ms:\n")
 for i in range(n_states): 
     print("\t\tp_{:d} = {:.3f}".format(i, mean_durs[i]*1000))
 # Histograms of mean durations
+bin_size = np.arange(1,84,4)
 for i in range(n_states):
     # durations in ms
     all_dur = [(j/250)*1000 for j in all_durs[i]]
     plt.figure()
-    plt.hist(all_dur)
+    plt.hist(all_dur, bins=bin_size)
+    plt.xticks(bin_size)
+    plt.yticks(np.arange(0, 1100, 100))
+    plt.grid(True)
+    plt.xlabel('Duration of mSts in ms')
+    plt.ylabel('Number of mSts')
+    
+    
+# Histograms of mean durations - all mSts together
+labls = ['Microstate1', 'Microstate2', 'Microstate3', 'Microstate4']
+bin_size = np.arange(0,22,1)
+plt.figure()
+plt.hist(all_durs, bins=bin_size, label=labls)
+plt.xticks(bin_size)
+plt.yticks(np.arange(0, 1300, 100))
+plt.grid(True)
+plt.legend(prop={'size': 10})
+plt.xlabel('Duration of mSts in samples')
+plt.ylabel('Number of mSts')
+
+

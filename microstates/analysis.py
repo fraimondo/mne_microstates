@@ -9,7 +9,7 @@ Microstates analysis functions
 """
 import numpy as np
 
-def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=False):
+def p_empirical(segmentation, n_epochs, n_samples=0, n_states=4, epoched_data=False):
     """Empirical symbol distribution
     Or in other words of Michel2018, Segment Count Density:
         the fraction of total recording time for which a given microstate
@@ -38,10 +38,12 @@ def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=Fals
     
     if epoched_data == True:
         all_p = []
-        p = np.zeros(n_states)
+        # Array with the count of mst occurences
+        p = np.zeros(n_states) # instead: n_states+1
         n = len(segmentation)
         for i in range(n_epochs):
             for j in range(n_samples):
+                # if segmentation[(n_samples*i)+(j)] != 88: 
                 p[segmentation[(n_samples*i)+(j)]] += 1.0
             p /= n # dividing by n here and not by n_samples for value accuracy
             all_p.append(p)
@@ -77,8 +79,6 @@ def mean_dur(segmentation, sfreq, n_states=4):
         all_durs : list of lists
             Contains all the durations of each microstate. 
     """
-    import matplotlib.pyplot as plt
-    
     durs = np.zeros((int(n_states), 2)) 
     n = len(segmentation)
     dur = 0
@@ -90,10 +90,8 @@ def mean_dur(segmentation, sfreq, n_states=4):
             durs[segmentation[i]][1] += 1
             all_durs[segmentation[i]].append(dur)
             dur = 0
-
     mean_durs = durs[:, 0] / durs[:, 1]
     mean_durs /= sfreq # we get the mean_durs in seconds
-    
     return mean_durs, all_durs
 
 def T_empirical(segmentation, n_states):

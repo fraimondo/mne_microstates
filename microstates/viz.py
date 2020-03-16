@@ -43,7 +43,7 @@ def plot_segmentation(segmentation, data, times, n_states=4):
     plt.tight_layout()
 
 
-def plot_maps(maps, info):
+def plot_maps(maps, info, num=None):
     """Plot prototypical microstate maps.
 
     Parameters
@@ -53,9 +53,14 @@ def plot_maps(maps, info):
     info : instance of mne.io.Info
         The info structure of the dataset, containing the location of the
         sensors.
+    num : int
+        The number to be written above the topo.
     """
     plt.figure(figsize=(2 * len(maps), 2))
     for i, t_map in enumerate(maps):
         plt.subplot(1, len(maps), i + 1)
         mne.viz.plot_topomap(t_map, pos=info)
-        plt.title('%d' % i)
+        if num is not None:
+            plt.title('%d' % num)
+        else:
+            plt.title('%d' % i )
