@@ -126,7 +126,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                                                replace=False)
             peaks = peaks[chosen_peaks]
         
-        
         # Taking the data only at the GFP peaks and recalculating the GFP    
         data_peaks = data[:, peaks]
         gfp = np.mean(data_peaks ** 2, axis=0)
@@ -174,8 +173,7 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
     The samples of the segmentation which should not be used are attributed 
     the value 88. 
     
-    
-        Parameters
+    Parameters
     ----------
     segmetation : ndarray, shape (n_samples,)
         For each sample, the index of the microstate to which the sample has
@@ -199,7 +197,7 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
         
         first_mst = seg_new[n_samples*i]
         seg_new[n_samples*i] = 88
-        for j in range(n_samples):
+        for j in range(1:n_samples):
             if seg_new[(n_samples*i)+j] == first_mst:
                 seg_new[(n_samples*i)+j] = 88
             else:

@@ -129,3 +129,61 @@ plt.grid(True)
 plt.legend(prop={'size': 10})
 plt.xlabel('Duration of mSts in samples')
 plt.ylabel('Number of mSts')
+
+#%% Topo plots
+# Path where to save the images/gifs:
+path = '.../'
+
+# Plot all topos of a single epoch
+eps = epochs.get_data()
+ep = eps[99]
+# Transpose the epoch data from (ch_num, epo_length) to (epo_length, ch_num)
+ep_T = np.transpose(ep)
+for i in range(106):
+    mst.viz.plot_maps(ep_T[i:i+1], epochs.info, i)
+    plt.savefig(path + 'img' + str(i) + '.png')
+    plt.close()
+
+# Creating a gif of all the single topos
+import imageio
+filenames = [path + 'img'+str(i)+'.png' for i in range(106)]
+with imageio.get_writer(path + 'movie.gif', mode='I') as writer:
+    for filename in filenames:
+        image = imageio.imread(filename)
+        writer.append_data(image)
+        
+# Plot all topos in one figure
+plt.figure(figsize=(2 * 10, 2 * 11)) # 11 rows, 10 col
+for i, t_map in enumerate(ep_T):
+    plt.subplot(11, 10, i + 1)
+    mne.viz.plot_topomap(t_map, pos=epochs.info)
+    plt.title('%d' % i )
+plt.savefig(path + 'imgs.png')
+
+########################################################################
+# Plotting the original topo per epoch and next to it the attributed mst
+eps = epochs.get_data()
+ep_num = 99
+ep = eps[ep_num]
+num_chan, epo_len = ep.shape
+ep_T = np.transpose(ep)
+info = mne.pick_info(epochs[ep_num].info, 
+                     mne.pick_types(epochs[ep_num].info, eeg=True))
+seg = segmentation[ep_num*epo_len:(ep_num+1)*epo_len]
+
+for i, t_map in enumerate(ep_T):
+    mst_map = maps[seg[i]]
+    topo_mst = np.concatenate([[t_map], [mst_map]])
+    mst.viz.plot_maps(topo_mst[0:2], info, i)
+    plt.savefig(path + 'topos'+ str(i) +'.png')
+    plt.close()
+
+from fpdf import FPDF
+pdf = FPDF()
+# imagelist is the list with all image filenames
+imagelist = [path + 'topos'+str(i)+'.png' for i in range(epo_len)]
+pdf.add_page()
+for image in imagelist:
+    pdf.image(image)
+pdf.output(path +"topo_mst.pdf", "F")
+########################################################################
