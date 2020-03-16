@@ -98,24 +98,29 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     # Find peaks in the global field power (GFP)
     gfp = np.mean(data ** 2, axis=0)   
     
-    # Remove the GFP values above a limit 
-    # in this case 1 standard deviation above the mean. 
+    
+    # Find a limit for high GFP values
+    # in this case the limit is at 1 standard deviation above the mean. 
     # Suggested by Poulsen et al. 2018
     gfp_std = np.std(gfp)
     gfp_mean = np.mean(gfp)
     gfp_std_limit = gfp_mean + gfp_std
-    gfp = [i for i in gfp if i < gfp_std_limit]
     
-    # Remove the lower 15% of the GFP distribution.
+    # Find the limit for the lower 15% of the GFP distribution.
     # Suggested by Mishra et al. 2020 (X. Cohen)
     gfp_sorted = np.sort(gfp)
-    # Find the value of the lower 15 % of the distribution
     gfp_percent_limit = gfp_sorted[round(len(gfp) * 0.15) + 1]
-    gfp = [i for i in gfp if i > gfp_percent_limit]
     
     if use_peaks == True: 
         # Find the peaks in the GFP
-        peaks, _ = find_peaks(gfp, distance=min_peak_dist)        
+        peaks, _ = find_peaks(gfp, distance=min_peak_dist)
+
+        # Remove the GFP values above a limit 
+        peaks = [i for i in peaks if gfp[i] < gfp_std_limit]
+        
+        # Remove the lower 15% of the GFP distribution.
+        peaks = [i for i in peaks if gfp[i] > gfp_percent_limit]
+        
         n_peaks = len(peaks)
         # Limit the number of peaks by randomly selecting them
         if max_n_peaks is not None:
