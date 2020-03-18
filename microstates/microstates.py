@@ -98,7 +98,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     # Find peaks in the global field power (GFP)
     gfp = np.mean(data ** 2, axis=0)   
     
-    
     # Find a limit for high GFP values
     # in this case the limit is at 1 standard deviation above the mean. 
     # Suggested by Poulsen et al. 2018
@@ -115,11 +114,11 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         # Find the peaks in the GFP
         peaks, _ = find_peaks(gfp, distance=min_peak_dist)
 
-        # Remove the GFP values above a limit 
-        peaks = [i for i in peaks if gfp[i] < gfp_std_limit]
-        
+
         # Remove the lower 15% of the GFP distribution.
-        peaks = [i for i in peaks if gfp[i] > gfp_percent_limit]
+                # and Remove the GFP values above a limit 
+        peaks = np.array([i for i in peaks 
+                          if gfp[i] > gfp_percent_limit and gfp[i] < gfp_std_limit])
         
         n_peaks = len(peaks)
         # Limit the number of peaks by randomly selecting them
@@ -155,7 +154,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         
         activation = maps.dot(data)
         segmentation = np.argmax(activation ** 2, axis=0)
-        map_corr = _corr_vectors(data, maps[segmentation].T)
+        map_corr = _corr_vectors(data_peaks, maps[segmentation].T)
 #        limmap = [i for i in map_corr if i > 0.5 or i < -0.5]
 
         # Compare across iterations using global explained variance (GEV) of
@@ -202,7 +201,7 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
         
         first_mst = seg_new[n_samples*i]
         seg_new[n_samples*i] = 88
-        for j in range(1:n_samples):
+        for j in range(1,n_samples):
             if seg_new[(n_samples*i)+j] == first_mst:
                 seg_new[(n_samples*i)+j] = 88
             else:
@@ -210,7 +209,7 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
         
         last_mst = seg_new[n_samples*(i+1) - 1]
         seg_new[n_samples*(i+1) - 1] = 88      
-        for j in range(1:n_samples):
+        for j in range(1,n_samples):
             if seg_new[n_samples*(i+1) - (j+1)] == last_mst:
                 seg_new[n_samples*(i+1) - (j+1)] = 88
             else:
