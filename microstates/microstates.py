@@ -16,7 +16,6 @@ from scipy.linalg import eigh
 import mne
 from mne.utils import logger, verbose
 
-
 @verbose
 def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             use_peaks=True, normalize=False, min_peak_dist=2, max_n_peaks=10000,
@@ -84,9 +83,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     logger.info('Finding %d microstates, using %d random intitializations' %
                 (n_states, n_inits))
     
-    if normalize:
-        data = zscore(data, axis=1)
-
     if use_peaks == True: 
         if len(data.shape) == 3:
             logger.info('Finding microstates from epoched data.')
@@ -94,31 +90,35 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             # Make 2D and keep events info
             data = np.hstack(data)
             # events = np.arange(0, data.shape[1], n_samples)
+            
+    if normalize:
+        data = zscore(data, axis=1)
 
     # Find peaks in the global field power (GFP)
     gfp = np.mean(data ** 2, axis=0)   
-    
-    # Find a limit for high GFP values
-    # in this case the limit is at 1 standard deviation above the mean. 
-    # Suggested by Poulsen et al. 2018
-    gfp_std = np.std(gfp)
-    gfp_mean = np.mean(gfp)
-    gfp_std_limit = gfp_mean + gfp_std
-    
-    # Find the limit for the lower 15% of the GFP distribution.
-    # Suggested by Mishra et al. 2020 (X. Cohen)
-    gfp_sorted = np.sort(gfp)
-    gfp_percent_limit = gfp_sorted[round(len(gfp) * 0.15) + 1]
+    # Shouldn't it be this?
+    #        gfp_hm = np.std(data, axis=0)
     
     if use_peaks == True: 
+        # Find a limit for high GFP values
+        # in this case the limit is at 1 standard deviation above the mean. 
+        # Suggested by Poulsen et al. 2018
+        gfp_std = np.std(gfp)
+        gfp_mean = np.mean(gfp)
+        gfp_std_limit = gfp_mean + gfp_std
+        
+        # Find the limit for the lower 15% of the GFP distribution.
+        # Suggested by Mishra et al. 2020 (X. Cohen)
+        gfp_sorted = np.sort(gfp)
+        gfp_percent_limit = gfp_sorted[round(len(gfp) * 0.15) + 1]
+        
         # Find the peaks in the GFP
         peaks, _ = find_peaks(gfp, distance=min_peak_dist)
 
-
         # Remove the lower 15% of the GFP distribution.
-                # and Remove the GFP values above a limit 
-        peaks = np.array([i for i in peaks 
-                          if gfp[i] > gfp_percent_limit and gfp[i] < gfp_std_limit])
+        # and Remove the GFP values above a limit 
+        peaks = [i for i in peaks if gfp[i] > gfp_percent_limit and gfp[i] < gfp_std_limit]
+        peaks = np.array(peaks)        
         
         n_peaks = len(peaks)
         # Limit the number of peaks by randomly selecting them
@@ -130,11 +130,8 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                                                replace=False)
             peaks = peaks[chosen_peaks]
         
-        # Taking the data only at the GFP peaks and recalculating the GFP    
+        # Taking the data only at the GFP peaks   
         data_peaks = data[:, peaks]
-        gfp = np.mean(data_peaks ** 2, axis=0)
-        # Shouldn't it be this?
-        #        gfp_hm = np.std(data, axis=0)
 
         # Cache this value for later
         gfp_sum_sq = np.sum(gfp ** 2)
@@ -152,9 +149,10 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         maps = _mod_kmeans(data_peaks, n_states, n_inits, max_iter, 
                            thresh, random_state, verbose)
         
+        # Finding the segmentation for the whole data
         activation = maps.dot(data)
         segmentation = np.argmax(activation ** 2, axis=0)
-        map_corr = _corr_vectors(data_peaks, maps[segmentation].T)
+        map_corr = _corr_vectors(data, maps[segmentation].T)
 #        limmap = [i for i in map_corr if i > 0.5 or i < -0.5]
 
         # Compare across iterations using global explained variance (GEV) of
@@ -194,11 +192,9 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
     new_seg : ndarray, shape (n_samples,)
         For each sample, the index of the microstate to which the sample has
         been assigned.
-    
     """
     seg_new = segmentation
     for i in range(n_epochs):
-        
         first_mst = seg_new[n_samples*i]
         seg_new[n_samples*i] = 88
         for j in range(1,n_samples):
@@ -206,14 +202,15 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
                 seg_new[(n_samples*i)+j] = 88
             else:
                 break 
-        
+            
         last_mst = seg_new[n_samples*(i+1) - 1]
-        seg_new[n_samples*(i+1) - 1] = 88      
-        for j in range(1,n_samples):
-            if seg_new[n_samples*(i+1) - (j+1)] == last_mst:
-                seg_new[n_samples*(i+1) - (j+1)] = 88
+        seg_new[n_samples*(i+1) - 1] = 88
+        for z in range(1,n_samples):
+            if seg_new[n_samples*(i+1) - (z+1)] == last_mst:
+                seg_new[n_samples*(i+1) - (z+1)] = 88
             else:
                 break
+            
     return seg_new
 
 @verbose

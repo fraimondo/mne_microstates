@@ -53,11 +53,12 @@ if EGI256 == True:
 
 # Segment the data in microstates
 maps, segmentation, gev, gfp_peaks = mst.segment(
-        epochs.get_data(), n_states, n_inits, min_peak_dist=10, normalize=True)
+        epochs.get_data(), n_states, n_inits, normalize=True, 
+        min_peak_dist=10, max_n_peaks=10000)
 
 
 # Mark each epoch at a beginning and at an end of an epoch w/ the value 88
-seg_w_borders = mst.mark_border_msts(segmentation, n_states, n_epochs, n_samples) 
+seg_w_borders = mst.mark_border_msts(segmentation, n_epochs, n_samples, n_states) 
 # Remove the values 88 of the segmentation
 seg_wo_borders = segmentation[segmentation != 88]
 
