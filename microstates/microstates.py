@@ -12,6 +12,7 @@ import numpy as np
 from scipy.stats import zscore
 from scipy.signal import find_peaks
 from scipy.linalg import eigh
+from scipy.signal import lfilter
 
 import mne
 from mne.utils import logger, verbose
@@ -100,6 +101,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     #        gfp_hm = np.std(data, axis=0)
     
     if use_peaks == True: 
+        
         # Find a limit for high GFP values
         # in this case the limit is at 1 standard deviation above the mean. 
         # Suggested by Poulsen et al. 2018
@@ -166,52 +168,6 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         return best_maps, best_segmentation, best_gev, peaks #, map_corr, limmap
     elif use_peaks == False:
         return best_maps, best_gev
-    
-def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
-    """ Marks the microstates surrounding the epoch edges.
-    This is done because when we use epoched data, we cannot know when a 
-    microstate would have ended or would have begun if we hadn't cut the data. 
-    
-    The samples of the segmentation which should not be used are attributed 
-    the value 88. 
-    
-    Parameters
-    ----------
-    segmetation : ndarray, shape (n_samples,)
-        For each sample, the index of the microstate to which the sample has
-        been assigned.
-    n_epochs : int
-        The number of epochs of the segmented file.
-    n_samples : int
-        The number of samples in an epoch.
-    n_states : int
-        The number of unique microstates to find. Defaults to 4.
- 
-    Returns
-    -------
-    new_seg : ndarray, shape (n_samples,)
-        For each sample, the index of the microstate to which the sample has
-        been assigned.
-    """
-    seg_new = segmentation
-    for i in range(n_epochs):
-        first_mst = seg_new[n_samples*i]
-        seg_new[n_samples*i] = 88
-        for j in range(1,n_samples):
-            if seg_new[(n_samples*i)+j] == first_mst:
-                seg_new[(n_samples*i)+j] = 88
-            else:
-                break 
-            
-        last_mst = seg_new[n_samples*(i+1) - 1]
-        seg_new[n_samples*(i+1) - 1] = 88
-        for z in range(1,n_samples):
-            if seg_new[n_samples*(i+1) - (z+1)] == last_mst:
-                seg_new[n_samples*(i+1) - (z+1)] = 88
-            else:
-                break
-            
-    return seg_new
 
 @verbose
 def _mod_kmeans(data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
@@ -308,3 +264,166 @@ def _corr_vectors(A, B, axis=0):
     An /= np.linalg.norm(An, axis=axis)
     Bn /= np.linalg.norm(Bn, axis=axis)
     return np.sum(An * Bn, axis=axis)
+
+def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1000, thresh=1e-6):
+    """
+    # The seg_smoothing and window_smoothing functions are adapted from Poulsen et al. (2018) [2].
+    # Originally, window_smoothing is described in Pasqual-Marqui et al. (1995) [1]. 
+    
+    # Inputs:
+    #  X --> data          - EEG (channels x samples (x trials)).
+    #  A --> maps          - Spatial distribution of microstate prototypes (channels x K).
+    #  smooth_type - Smoothing type: 'windowed'.  
+    
+    # * Windowed smoothing:
+    #        b              - Smoothing width. Integer denoting the number of
+    #                         samples on each side of current sample
+    #                         (default: 3).
+    #        lambda         - Smoothing weight (default: 5).
+    #        max_iterations - Maximum number of iterations of algorithm
+    #                         (default: 1000).
+    #        thresh         - Threshold of convergence based on relative change
+    #                         in noise variance (default: 1e-6).
+        
+        # Output:
+    #  L --> seg_smooth - (segmentation) Label of the most active microstate at each timepoint 
+    #        (trials x time).  
+        
+    # Reference:
+    #  [1] - Pascual-Marqui, R. D., Michel, C. M., & Lehmann, D. (1995).
+    #        Segmentation of brain electrical activity into microstates: model
+    #        estimation and validation. IEEE Transactions on Biomedical
+    #        Engineering.
+    #  [2] - Poulsen, A. T., Pedroni, A., Langer, N., &  Hansen, L. K.
+    #        (unpublished manuscript). Microstate EEGlab toolbox: An
+    #        introductionary guide.
+    """    
+    ## Select smoothing type and loop over trials
+    if 'windowed' == smooth_type:
+        logger.info('Using the Window Segmentation Smoothing Algorithm.')
+        if len(data.shape) == 3:
+            logger.info('Window smoothening the segmentation from epoched data.')
+            n_epochs, n_chans, n_samples = data.shape
+            seg_smooth = np.zeros((n_samples, n_epochs))
+            for epo in range(n_epochs):
+                seg_smooth[:,epo] = _window_smoothing(data[epo,:,:], maps, b=3, l=5, max_iterations=1000, thresh=1e-6)
+        elif len(data.shape) == 2:
+            logger.info('Window smoothening the segmentation from continuous data.')
+            n_chans, n_samples = data.shape
+            seg_smooth = np.zeros(n_samples)
+            seg_smooth = _window_smoothing(data, maps, b=3, l=5, max_iterations=1000, thresh=1e-6)
+    else:
+        print('Unknown smoothing type: %s', smooth_type)
+    
+    return seg_smooth
+
+def _window_smoothing(data=None, maps=None, b=3, l=5, max_iterations=1000, thresh=1e-6):
+    """
+    #  Implementation of the Segmentation Smoothing Algorithm, as described in
+    #  Table II of [1]. Smoothes using the interval t-b to t+b excluding t.
+    #  Note, that temporary allocation of labels (denoted with Lambda in [1])
+    #  is not necessary in this implementation, and steps 3 and 6 are therefore
+    #  left out.
+    """
+    ## Initialisation (step 1 to 4)
+    n_chans, n_samples = data.shape
+    n_states, __ = maps.shape
+    const = sum(sum(data ** 2))
+
+    # Step 1
+    sig2_old = 0
+    sig2 = float('inf')
+    
+    # Step 2    
+    activation = maps.dot(data)
+    seg = np.argmax(activation ** 2, axis=0)
+    #Check to avoid the loop getting caught and switching one label back and
+    # forth between iterations.
+    L_old=np.zeros((3, np.size(seg)))
+    
+    # Step 4
+    e = (const - sum(sum(np.multiply(maps.T[:,seg], data)) ** 2)) / (np.dot(n_samples, (n_chans-1)))
+    
+    # Defining constant for step 5b
+    tmp = sum(data ** 2)
+    const_5b = (np.tile(tmp, (n_states,1)) - activation**2) / (2*e*(n_chans-1))
+    tmp = None
+    
+    ## Iterations (step 5 to 8)
+    ind=0
+    while abs(sig2_old-sig2)>=(thresh*sig2) and max_iterations>ind and np.mean(L_old[np.remainder(ind,2)+1]==seg)!=1:
+        ind = ind + 1
+        sig2_old = sig2
+        L_old[abs(np.remainder(ind, 2) - 2)] = seg
+        Nbkt_tmp = np.zeros((n_states, n_samples))
+        
+        for k in range(n_states):
+            Nbkt_tmp[k,:] = (seg == k)
+
+        #using filter to count the number of labels equal to k before (tmp1)
+        #and after (tmp2) a given timepoint.
+        tmp1 = lfilter([0, *np.ones(b)], 1, Nbkt_tmp, 1)
+        tmp2 = lfilter([0, *np.ones(b)], 1, Nbkt_tmp[:, ::-1], 1)
+        Nbkt = tmp1 + tmp2[:, ::-1]
+        
+        # Step 5b
+        seg = np.argmin((const_5b - l*Nbkt), axis=0)
+        
+        # Step 7
+        sig2 = (const - sum(sum(np.multiply(maps.T[:,seg], data)) ** 2)) / (np.dot(n_samples,(n_chans-1)))
+
+    seg_smooth = seg
+    
+    # Step 10 - un-checked. Only Matlab --> Python translated
+    # sig2_D = const / (N*(C-1));
+    # R2 = 1 - sig2/sig2_D;
+    # activations = zeros(size(Z));
+    # for n=1:N; activations(L(n),n) = Z(L(n),n); end # setting to zero
+    # MSE = mean(mean((X-A*activations).^2));
+    return seg_smooth
+
+def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
+    """ Marks the microstates surrounding the epoch edges.
+    This is done because when we use epoched data, we cannot know when a 
+    microstate would have ended or would have begun if we hadn't cut the data. 
+    
+    The samples of the segmentation which should not be used are attributed 
+    the value 88. 
+    
+    Parameters
+    ----------
+    segmetation : ndarray, shape (n_samples,)
+        For each sample, the index of the microstate to which the sample has
+        been assigned.
+    n_epochs : int
+        The number of epochs of the segmented file.
+    n_samples : int
+        The number of samples in an epoch.
+    n_states : int
+        The number of unique microstates to find. Defaults to 4.
+ 
+    Returns
+    -------
+    new_seg : ndarray, shape (n_samples,)
+        For each sample, the index of the microstate to which the sample has
+        been assigned.
+    """
+    seg_new = segmentation
+    for i in range(n_epochs):
+        first_mst = seg_new[n_samples*i]
+        seg_new[n_samples*i] = 88
+        for j in range(1,n_samples):
+            if seg_new[(n_samples*i)+j] == first_mst:
+                seg_new[(n_samples*i)+j] = 88
+            else:
+                break 
+            
+        last_mst = seg_new[n_samples*(i+1) - 1]
+        seg_new[n_samples*(i+1) - 1] = 88
+        for z in range(1,n_samples):
+            if seg_new[n_samples*(i+1) - (z+1)] == last_mst:
+                seg_new[n_samples*(i+1) - (z+1)] = 88
+            else:
+                break
+            
+    return seg_new

@@ -42,9 +42,9 @@ n_epochs, n_chans, n_samples = epochs.get_data().shape
 
 # Removing channels around the face and neck because of artefacts
 if EGI256 == True:
-    epochs.drop_channels(['E67', 'E73', 'E247', 'E251', 'E256', 'E243', 'E246', 'E250', 
-                          'E255', 'E82', 'E91', 'E254', 'E249', 'E245', 'E242', 'E253',
-                          'E252', 'E248', 'E244', 'E241', 'E92', 'E102', 'E103', 'E111', 
+    epochs.drop_channels(['E67',  'E73',  'E247', 'E251', 'E256', 'E243', 'E246', 'E250', 
+                          'E255', 'E82',  'E91',  'E254', 'E249', 'E245', 'E242', 'E253',
+                          'E252', 'E248', 'E244', 'E241', 'E92',  'E102', 'E103', 'E111', 
                           'E112', 'E120', 'E121', 'E133', 'E134', 'E145', 'E146', 'E156', 
                           'E165', 'E166', 'E174', 'E175', 'E187', 'E188', 'E199', 'E200', 
                           'E208', 'E209', 'E216', 'E217', 'E228', 'E229', 'E232', 'E233',  
@@ -56,6 +56,8 @@ maps, segmentation, gev, gfp_peaks = mst.segment(
         epochs.get_data(), n_states, n_inits, normalize=True, 
         min_peak_dist=10, max_n_peaks=10000)
 
+# Smoothen the segmentation
+segmentation_smooth = mst.seg_smoothing(data=epochs.get_data(), maps=maps)
 
 # Mark each epoch at a beginning and at an end of an epoch w/ the value 88
 seg_w_borders = mst.mark_border_msts(segmentation, n_epochs, n_samples, n_states) 
