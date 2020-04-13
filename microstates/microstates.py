@@ -265,7 +265,7 @@ def _corr_vectors(A, B, axis=0):
     Bn /= np.linalg.norm(Bn, axis=axis)
     return np.sum(An * Bn, axis=axis)
 
-def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1000, thresh=1e-6):
+def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1000, thresh=1e-6, normalize=False):
     """
     # The seg_smoothing and window_smoothing functions are adapted from Poulsen et al. (2018) [2].
     # Originally, window_smoothing is described in Pasqual-Marqui et al. (1995) [1]. 
@@ -288,6 +288,7 @@ def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1
         # Output:
     #  L --> seg_smooth - (segmentation) Label of the most active microstate at each timepoint 
     #        (trials x time).  
+    #       seg_orig --> I return the original segmentation but in epochs
         
     # Reference:
     #  [1] - Pascual-Marqui, R. D., Michel, C. M., & Lehmann, D. (1995).
@@ -301,21 +302,33 @@ def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1
     ## Select smoothing type and loop over trials
     if 'windowed' == smooth_type:
         logger.info('Using the Window Segmentation Smoothing Algorithm.')
+        
+
         if len(data.shape) == 3:
             logger.info('Window smoothening the segmentation from epoched data.')
             n_epochs, n_chans, n_samples = data.shape
+            # Normalize the data if True (to be consistent w/ segment )
+            if normalize:
+                for i in range(n_chans):
+                    data[:,i,:] = zscore(data[:,i,:], axis=None)
+
             seg_smooth = np.zeros((n_samples, n_epochs))
+            seg_orig_epo = np.zeros((n_samples, n_epochs))
             for epo in range(n_epochs):
-                seg_smooth[:,epo] = _window_smoothing(data[epo,:,:], maps, b=3, l=5, max_iterations=1000, thresh=1e-6)
+                seg_smooth[:,epo], seg_orig_epo[:,epo] = _window_smoothing(data[epo,:,:], maps, b, l, max_iterations, thresh)
+        
         elif len(data.shape) == 2:
             logger.info('Window smoothening the segmentation from continuous data.')
             n_chans, n_samples = data.shape
+            # Normalize the data if True (to be consistent w/ segment )
+            if normalize:
+                data = zscore(data, axis=1)
             seg_smooth = np.zeros(n_samples)
             seg_smooth = _window_smoothing(data, maps, b=3, l=5, max_iterations=1000, thresh=1e-6)
     else:
         print('Unknown smoothing type: %s', smooth_type)
     
-    return seg_smooth
+    return seg_smooth, seg_orig_epo
 
 def _window_smoothing(data=None, maps=None, b=3, l=5, max_iterations=1000, thresh=1e-6):
     """
@@ -325,6 +338,7 @@ def _window_smoothing(data=None, maps=None, b=3, l=5, max_iterations=1000, thres
     #  is not necessary in this implementation, and steps 3 and 6 are therefore
     #  left out.
     """
+    
     ## Initialisation (step 1 to 4)
     n_chans, n_samples = data.shape
     n_states, __ = maps.shape
@@ -337,6 +351,7 @@ def _window_smoothing(data=None, maps=None, b=3, l=5, max_iterations=1000, thres
     # Step 2    
     activation = maps.dot(data)
     seg = np.argmax(activation ** 2, axis=0)
+    seg_orig = seg
     #Check to avoid the loop getting caught and switching one label back and
     # forth between iterations.
     L_old=np.zeros((3, np.size(seg)))
@@ -380,9 +395,9 @@ def _window_smoothing(data=None, maps=None, b=3, l=5, max_iterations=1000, thres
     # activations = zeros(size(Z));
     # for n=1:N; activations(L(n),n) = Z(L(n),n); end # setting to zero
     # MSE = mean(mean((X-A*activations).^2));
-    return seg_smooth
+    return seg_smooth, seg_orig
 
-def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
+def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4, epoched_data=False):
     """ Marks the microstates surrounding the epoch edges.
     This is done because when we use epoched data, we cannot know when a 
     microstate would have ended or would have begun if we hadn't cut the data. 
@@ -408,22 +423,42 @@ def mark_border_msts(segmentation, n_epochs, n_samples, n_states=4):
         For each sample, the index of the microstate to which the sample has
         been assigned.
     """
-    seg_new = segmentation
-    for i in range(n_epochs):
-        first_mst = seg_new[n_samples*i]
-        seg_new[n_samples*i] = 88
-        for j in range(1,n_samples):
-            if seg_new[(n_samples*i)+j] == first_mst:
-                seg_new[(n_samples*i)+j] = 88
-            else:
-                break 
-            
-        last_mst = seg_new[n_samples*(i+1) - 1]
-        seg_new[n_samples*(i+1) - 1] = 88
-        for z in range(1,n_samples):
-            if seg_new[n_samples*(i+1) - (z+1)] == last_mst:
-                seg_new[n_samples*(i+1) - (z+1)] = 88
-            else:
-                break
-            
+    border_mst_val = n_states
+    seg_new = segmentation.copy()
+
+    if epoched_data == False: # if the segmentation is continuous
+        for i in range(n_epochs):
+            first_mst = seg_new[n_samples*i]
+            seg_new[n_samples*i] = border_mst_val
+            for j in range(1,n_samples):
+                if seg_new[(n_samples*i)+j] == first_mst:
+                    seg_new[(n_samples*i)+j] = border_mst_val
+                else:
+                    break 
+            last_mst = seg_new[n_samples*(i+1) - 1]
+            seg_new[n_samples*(i+1) - 1] = border_mst_val
+            for z in range(1,n_samples):
+                if seg_new[n_samples*(i+1) - (z+1)] == last_mst:
+                    seg_new[n_samples*(i+1) - (z+1)] = border_mst_val
+                else:
+                    break
+                
+    if epoched_data == True: # if the segmentation is not continuous and have an extra dim for epochs
+        # seg is 2D (segs, epochs)
+        for epo in range(n_epochs):
+            first_mst = seg_new[0,epo]
+            seg_new[0,epo] = border_mst_val
+            for j in range(1,n_samples):
+                if seg_new[j,epo] == first_mst:
+                    seg_new[j,epo] = border_mst_val
+                else:
+                    break 
+            last_mst = seg_new[-1,epo]
+            seg_new[-1,epo] = border_mst_val
+            for z in range(1,n_samples):
+                if seg_new[n_samples - (z+1), epo] == last_mst:
+                    seg_new[n_samples - (z+1), epo] = border_mst_val
+                else:
+                    break
+        
     return seg_new

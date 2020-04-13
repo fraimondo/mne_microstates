@@ -9,7 +9,7 @@ Microstates analysis functions
 """
 import numpy as np
 
-def p_empirical(segmentation, n_epochs, n_samples=0, n_states=4, epoched_data=False):
+def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=False):
     """Empirical symbol distribution
     Or in other words of Michel2018, Segment Count Density:
         the fraction of total recording time for which a given microstate
@@ -25,34 +25,34 @@ def p_empirical(segmentation, n_epochs, n_samples=0, n_states=4, epoched_data=Fa
             The number of samples in an epoch.
         n_states : int
             The number of unique microstates to find. Defaults to 4.
-        epoched_data : bool
-            If True it means the segmentation was done on epoched data. 
-            The transitions between the last microstate of epoch n and the first 
-            microstate of epoch n+1, should not be taken into consideration. 
-            Defaults to False.
+#        epoched_data : bool
+#            If True it means the segmentation was done on epoched data. 
+#            The transitions between the last microstate of epoch n and the first 
+#            microstate of epoch n+1, should not be taken into consideration. 
+#            Defaults to False.
         
     Returns:
         p  : ndarray, (n_states,)
             Empirical distribution
     """
     
-    if epoched_data == True:
-        all_p = []
-        # Array with the count of mst occurences
-        p = np.zeros(n_states) # instead: n_states+1
-        n = len(segmentation)
-        for i in range(n_epochs):
-            for j in range(n_samples):
-                # if segmentation[(n_samples*i)+(j)] != 88: 
-                p[segmentation[(n_samples*i)+(j)]] += 1.0
-            p /= n # dividing by n here and not by n_samples for value accuracy
-            all_p.append(p)
-        all_p = np.vstack(all_p)
-        # sums the probabilities across all epochs
-        all_p_sum = np.sum(all_p, axis=0)
-        p = all_p_sum
+#    if epoched_data == True:
+#        all_p = []
+#        # Array with the count of mst occurences
+#        p = np.zeros(n_states) # instead: n_states+1
+#        n = len(segmentation)
+#        for i in range(n_epochs):
+#            for j in range(n_samples):
+#                # if segmentation[(n_samples*i)+(j)] != 88: 
+#                p[segmentation[(n_samples*i)+(j)]] += 1.0
+#            p /= n # dividing by n here and not by n_samples for value accuracy
+#            all_p.append(p)
+#        all_p = np.vstack(all_p)
+#        # sums the probabilities across all epochs
+#        all_p_sum = np.sum(all_p, axis=0)
+#        p = all_p_sum
         
-    elif epoched_data == False:
+    if epoched_data == False:
         p = np.zeros(n_states)
         n = len(segmentation)
         for i in range(n):
@@ -61,7 +61,7 @@ def p_empirical(segmentation, n_epochs, n_samples=0, n_states=4, epoched_data=Fa
     
     return p
 
-def mean_dur(segmentation, sfreq, n_states=4):
+def mean_dur(segmentation, sfreq, n_states=5):
     """Mean duration of segments
         Average duration that a microstate remains stable. 
 
@@ -94,9 +94,11 @@ def mean_dur(segmentation, sfreq, n_states=4):
     mean_durs /= sfreq # we get the mean_durs in seconds
     return mean_durs, all_durs
 
-def T_empirical(segmentation, n_states):
+def T_empirical(segmentation, n_epochs, epoched_data=True, n_states=4):
     """Empirical transition matrix
-
+    The transition is from row to column.
+    Eg. [0,0] (mst1) --> [0,1] (mst2)
+    
     Args:
         segmentation : ndarray, shape (n_samples,)
             For each sample, the index of the microstate to which the sample has
@@ -106,17 +108,36 @@ def T_empirical(segmentation, n_states):
     Returns:
         T: empirical transition matrix
     """
-    T = np.zeros((n_states, n_states))
-    n = len(segmentation)
-    for i in range(n-1):
-        T[segmentation[i], segmentation[i+1]] += 1.0
-    p_row = np.sum(T, axis=1)
-    for i in range(n_states):
-        if ( p_row[i] != 0.0 ):
-            for j in range(n_states):
-                T[i,j] /= p_row[i]  # normalize row sums to 1.0
+    
+    if epoched_data == False:
+        T = np.zeros((n_states, n_states))
+        n = len(segmentation)
+        for i in range(n-1):
+             T[segmentation[i], segmentation[i+1]] += 1.0
+        p_row = np.sum(T, axis=1)
+        for i in range(n_states):
+            if ( p_row[i] != 0.0 ):
+                for j in range(n_states):
+                    T[i,j] /= p_row[i]  # normalize row sums to 1.0
+    
+    if epoched_data == True:            
+        # For data in epochs: columns:epochs, rows:segmentations 
+        T = np.zeros((n_states, n_states, n_epochs))
+        n = len(segmentation)    
+        for epo in range(n_epochs):
+            for i in range(n-1):
+                T[segmentation[i,epo], segmentation[i+1,epo], epo] += 1.0
+        p_row = np.sum(T, axis=1) # 2D (row_sums, epochs)
+        for epo in range(n_epochs):
+            for i in range(n_states):
+                if ( p_row[i,epo] != 0.0 ):
+                    for j in range(n_states):
+                        T[i,j,epo] /= p_row[i,epo]  # normalize row sums to 1.0
+        
+        # Average all the transition matrixes accross the different epochs            
+        T = np.average(T, axis=2)
+    
     return T
-
 
 def print_matrix(T):
     """Console-friendly output of the matrix T.

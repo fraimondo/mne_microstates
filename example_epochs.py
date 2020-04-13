@@ -62,7 +62,7 @@ segmentation_smooth = mst.seg_smoothing(data=epochs.get_data(), maps=maps)
 # Mark each epoch at a beginning and at an end of an epoch w/ the value 88
 seg_w_borders = mst.mark_border_msts(segmentation, n_epochs, n_samples, n_states) 
 # Remove the values 88 of the segmentation
-seg_wo_borders = segmentation[segmentation != 88]
+seg_wo_borders = seg_w_borders[seg_w_borders != 88]
 
 # Plot the topographic maps of the microstates and the segmentation
 mst.viz.plot_maps(maps, epochs.info)
@@ -107,7 +107,7 @@ mean_durs, all_durs = mst.analysis.mean_dur(segmentation, sfreq, n_states)
 print("\n\t Mean microstate durations in ms:\n")
 for i in range(n_states): 
     print("\t\tp_{:d} = {:.3f}".format(i, mean_durs[i]*1000))
-# Histograms of mean durations
+# Histograms of durations per mst
 bin_size = np.arange(1,84,4)
 for i in range(n_states):
     # durations in ms
@@ -121,7 +121,7 @@ for i in range(n_states):
     plt.ylabel('Number of mSts')
     
     
-# Histograms of mean durations - all mSts together
+# Histograms of durations - all mSts together
 labls = ['Microstate1', 'Microstate2', 'Microstate3', 'Microstate4']
 bin_size = np.arange(0,22,1)
 plt.figure()
@@ -164,7 +164,7 @@ for i, t_map in enumerate(ep_T):
 plt.savefig(path + 'imgs.png')
 
 ########################################################################
-# Plotting the original topo per epoch and next to it the attributed mst
+# Plotting the original topo per epoch and next to it the topo of the attributed mst
 eps = epochs.get_data()
 ep_num = 99
 ep = eps[ep_num]
