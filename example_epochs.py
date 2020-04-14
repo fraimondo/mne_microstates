@@ -37,8 +37,6 @@ n_states = 4
 n_inits = 5
 EGI256 = False
 sfreq = epochs.info['sfreq']
-n_epochs, n_chans, n_samples = epochs.get_data().shape
-
 
 # Removing channels around the face and neck because of artefacts
 if EGI256 == True:
@@ -50,6 +48,8 @@ if EGI256 == True:
                           'E208', 'E209', 'E216', 'E217', 'E228', 'E229', 'E232', 'E233',  
                           'E236', 'E237', 'E240', 'E218', 'E227', 'E231', 'E235', 'E239', 
                           'E219', 'E225', 'E226', 'E230', 'E234', 'E238'])
+n_epochs, n_chans, n_samples = epochs.get_data().shape
+
 
 # Segment the data in microstates
 maps, segmentation, gev, gfp_peaks = mst.segment(
@@ -92,6 +92,10 @@ mst.analysis.print_matrix(T_hat)
 # Plot a heatmap of the mSt transitions
 heat_map = sb.heatmap(T_hat, vmax= 0.15) #sum(T_hat)[0]/len(T_hat))
 plt.show()
+
+# Symmetry test for T_empirical
+# alpha is the significance level
+prob, T, df = mst.analysis.symmetryTest(X=segmentation, ns=n_states, alpha=0.01)
 
 # Peaks Per Second (PPS)
 fs = epochs.info['sfreq']

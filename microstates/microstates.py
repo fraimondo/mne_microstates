@@ -135,8 +135,8 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         # Taking the data only at the GFP peaks   
         data_peaks = data[:, peaks]
 
-        # Cache this value for later
-        gfp_sum_sq = np.sum(gfp ** 2)
+    # Cache this value for later
+    gfp_sum_sq = np.sum(gfp ** 2)
 
     # Do several runs of the k-means algorithm, keep track of the best
     # segmentation.

@@ -8,6 +8,7 @@ https://github.com/Frederic-vW/eeg_microstates
 Microstates analysis functions
 """
 import numpy as np
+from scipy.stats import chi2 
 
 def p_empirical(segmentation, n_epochs, n_samples, n_states=4, epoched_data=False):
     """Empirical symbol distribution
@@ -110,6 +111,7 @@ def T_empirical(segmentation, n_epochs, epoched_data=True, n_states=4):
     """
     
     if epoched_data == False:
+        # for a single epoch
         T = np.zeros((n_states, n_states))
         n = len(segmentation)
         for i in range(n-1):
@@ -120,7 +122,8 @@ def T_empirical(segmentation, n_epochs, epoched_data=True, n_states=4):
                 for j in range(n_states):
                     T[i,j] /= p_row[i]  # normalize row sums to 1.0
     
-    if epoched_data == True:            
+    if epoched_data == True:  
+        # for multiple epochs          
         # For data in epochs: columns:epochs, rows:segmentations 
         T = np.zeros((n_states, n_states, n_epochs))
         n = len(segmentation)    
@@ -152,3 +155,40 @@ def print_matrix(T):
             print("{:.3f}|\n".format(T[i,j]), end=' ')
         else:
             print("{:.3f}".format(T[i,j]), end=' ')
+            
+
+def symmetryTest(X, ns, alpha, verbose=True):
+    """Test symmetry of the transition matrix of symbolic sequence X with
+    ns symbols
+    cf. Kullback, Technometrics (1962)
+    H0 -> the transition probabilities matrix is symmetric
+    H1 -> the transition probabilities matrix is asymmetric
+    Args:
+        x  --> segmentation : symbolic sequence, symbols = [0, 1, 2, ...]
+        ns --> n_states : number of symbols
+        alpha: significance level  0.01
+    Returns:
+        p: p-value of the Chi2 test for independence
+    """
+
+    if verbose:
+        print( "\n\t\tSYMMETRY:" )
+    n = len(X)
+    f_ij = np.zeros((ns,ns))
+    for t in range(n-1):
+        i = X[t]
+        j = X[t+1]
+        f_ij[i,j] += 1.0
+    T = 0.0
+    for i, j in np.ndindex(f_ij.shape):
+        if (i != j):
+            f = f_ij[i,j]*f_ij[j,i]
+            if (f > 0):
+                T += (f_ij[i,j]*np.log((2.*f_ij[i,j])/(f_ij[i,j]+f_ij[j,i])))
+    T *= 2.0
+    df = ns*(ns-1)/2
+    #p = chi2test(T, df, alpha)
+    p = chi2.sf(T, df, loc=0, scale=1)
+    if verbose:
+        print(("\t\tp: {:.2e} | t: {:.3f} | df: {:.1f}".format(p, T, df)))
+    return p, T, df
