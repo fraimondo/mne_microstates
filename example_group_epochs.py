@@ -65,7 +65,7 @@ for i, f in enumerate(subj_folder):
     data = np.hstack(data)
     # Compute final microstate segmentations on the original data
     activation = group_maps.dot(data)
-    segmentation = np.argmax(activation ** 2, axis=0)
+    segmentation = np.argmax(np.abs(activation), axis=0)
     # Add all the per subject segmentations in one array
     # (n_times, subjects)
     grouped_segment.append(segmentation)

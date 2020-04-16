@@ -20,7 +20,7 @@ def plot_segmentation(segmentation, data, times, n_states=4):
     n_states : int
         The number of unique microstates to find. Defaults to 4.
     """
-    gfp = np.mean(data ** 2, axis=0)
+    gfp = np.std(data, axis=0)
     
 #    n_states = len(np.unique(segmentation))
     # Removed because for the group clustering it's a problem

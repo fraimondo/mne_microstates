@@ -96,7 +96,8 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         data = zscore(data, axis=1)
 
     # Find peaks in the global field power (GFP)
-    gfp = np.mean(data ** 2, axis=0)   
+#    gfp = np.mean(data ** 2, axis=0)   
+    gfp = np.std(data, axis=0)
     # Shouldn't it be this?
     #        gfp_hm = np.std(data, axis=0)
     
@@ -153,7 +154,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         
         # Finding the segmentation for the whole data
         activation = maps.dot(data)
-        segmentation = np.argmax(activation ** 2, axis=0)
+        segmentation = np.argmax(np.abs(activation), axis=0)
         map_corr = _corr_vectors(data, maps[segmentation].T)
 #        limmap = [i for i in map_corr if i > 0.5 or i < -0.5]
 
