@@ -351,7 +351,8 @@ def _window_smoothing(data=None, maps=None, b=3, l=5, max_iterations=1000, thres
     
     # Step 2    
     activation = maps.dot(data)
-    seg = np.argmax(activation ** 2, axis=0)
+#    seg = np.argmax(activation ** 2, axis=0)
+    seg = np.argmax(np.abs(activation), axis=0)
     seg_orig = seg
     #Check to avoid the loop getting caught and switching one label back and
     # forth between iterations.

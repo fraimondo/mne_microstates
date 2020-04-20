@@ -130,17 +130,19 @@ def T_empirical(segmentation, n_epochs, epoched_data=True, n_states=4):
         for epo in range(n_epochs):
             for i in range(n-1):
                 T[segmentation[i,epo], segmentation[i+1,epo], epo] += 1.0
-        p_row = np.sum(T, axis=1) # 2D (row_sums, epochs)
-        for epo in range(n_epochs):
-            for i in range(n_states):
-                if ( p_row[i,epo] != 0.0 ):
-                    for j in range(n_states):
-                        T[i,j,epo] /= p_row[i,epo]  # normalize row sums to 1.0
-        
         # Average all the transition matrixes accross the different epochs            
         T = np.average(T, axis=2)
-    
+        p_row = np.sum(T, axis=1) # 2D (row_sums, epochs)
+        for i in range(n_states):
+            if (p_row[i] != 0.0):
+                for j in range(n_states):
+                    T[i,j] = T[i,j] / p_row[i] # normalize row sums to 1.0
     return T
+
+
+def T_theoretical(p_hat, n_states):
+    T_th = np.array([[p_hat[i]*p_hat[j] for i in range(n_states)] for j in range(n_states)])  
+    return T_th
 
 def print_matrix(T):
     """Console-friendly output of the matrix T.
