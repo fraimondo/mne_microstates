@@ -108,8 +108,10 @@ def T_empirical(segmentation, n_epochs, epoched_data=True, n_states=4):
             The number of unique microstates to find. Defaults to 4.
     Returns:
         T: empirical transition matrix
+        
+    Note: T_empirical from the same epoched and continuous (stacked epoched) data 
+          differ in the 3rd/4th decimal place. 
     """
-    
     if epoched_data == False:
         # for a single epoch
         T = np.zeros((n_states, n_states))
@@ -140,9 +142,9 @@ def T_empirical(segmentation, n_epochs, epoched_data=True, n_states=4):
     return T
 
 
-def T_theoretical(p_hat, n_states):
-    T_th = np.array([[p_hat[i]*p_hat[j] for i in range(n_states)] for j in range(n_states)])  
-    return T_th
+#def T_theoretical(p_hat, n_states):
+#    T_th = np.array([[p_hat[i]*p_hat[j] for i in range(n_states)] for j in range(n_states)])  
+#    return T_th
 
 def print_matrix(T):
     """Console-friendly output of the matrix T.
@@ -159,7 +161,7 @@ def print_matrix(T):
             print("{:.3f}".format(T[i,j]), end=' ')
             
 
-def symmetryTest(X, ns, alpha, verbose=True):
+def symmetryTest(X, ns=4, alpha=0.01, verbose=True):
     """Test symmetry of the transition matrix of symbolic sequence X with
     ns symbols
     cf. Kullback, Technometrics (1962)
@@ -194,3 +196,75 @@ def symmetryTest(X, ns, alpha, verbose=True):
     if verbose:
         print(("\t\tp: {:.2e} | t: {:.3f} | df: {:.1f}".format(p, T, df)))
     return p, T, df
+
+def testMarkov0(seg, n_epochs, alpha, ns, epoched_data=True, verbose=True):
+    """Test zero-order Markovianity of symbolic sequence x with ns symbols.
+    Null hypothesis: zero-order MC (iid) <=>
+    p(X[t]), p(X[t+1]) independent
+    cf. Kullback, Technometrics (1962)
+    
+    Args:
+        seg: symbolic sequence, symbols = [0, 1, 2, ...]
+        ns: number of symbols
+        alpha: significance level
+    Returns:
+        p: p-value of the Chi2 test for independence
+    """
+    if verbose:
+        print( "\t\tZERO-ORDER MARKOVIANITY:" )
+    n = len(seg)
+    
+    T=0
+    if epoched_data == False:
+        f_ij = np.zeros((ns,ns))
+        f_i = np.zeros(ns)
+        f_j = np.zeros(ns)
+        # for a single epoch
+        # calculate f_ij p( x[t]=i, p( x[t+1]=j ) )
+        for t in range(n-1):
+            i = seg[t]
+            j = seg[t+1]
+            f_ij[i,j] += 1.0
+            f_i[i] += 1.0
+            f_j[j] += 1.0
+        T = 0.0 # statistic
+        for i, j in np.ndindex(f_ij.shape):
+            f = f_ij[i,j]*f_i[i]*f_j[j]
+            if (f > 0):
+                T += (f_ij[i,j] * np.log((n*f_ij[i,j])/(f_i[i]*f_j[j])))
+        T *= 2.0
+        
+    if epoched_data == True:  ### not sure if this can be done like this
+        # for multiple epochs          
+        # For data in epochs: columns:epochs, rows:segmentations 
+        # calculate f_ij p( x[t]=i, p( x[t+1]=j ) )
+        all_T = []
+        for epo in range(n_epochs):
+            T = 0.0 # statistic
+            f_ij = np.zeros((ns,ns))
+            f_i = np.zeros(ns)
+            f_j = np.zeros(ns)
+            seg_epo = seg[:, epo]
+            for t in range(n-1):
+                i = seg_epo[t]
+                j = seg_epo[t+1]
+                f_ij[i,j] += 1.0
+                f_i[i] += 1.0
+                f_j[j] += 1.0
+            for i, j in np.ndindex(f_ij.shape):
+                f = f_ij[i,j]*f_i[i]*f_j[j]
+                if (f > 0):
+                    T += (f_ij[i,j] * np.log((n*f_ij[i,j])/(f_i[i]*f_j[j])))
+            T *= 2.0
+            all_T.append(T)
+        all_T_ave = np.average(all_T)
+        T = all_T_ave
+        
+    # Degrees of Freedom:
+    df = (ns-1.0) * (ns-1.0)
+    #p = chi2test(T, df, alpha)
+    p = chi2.sf(T, df, loc=0, scale=1)
+    print(("\t\tp: {:.2e} | t: {:.3f} | df: {:.1f}".format(p, T, df)))
+    # For ns = 4, len(x)=201, alpha=0.01
+        # Marginal value of T for significance is 21.68. For T > 21.68, p < alpha
+    return p
