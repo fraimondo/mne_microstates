@@ -169,6 +169,8 @@ def symmetryTest(X, ns=4, alpha=0.01, verbose=True):
     H1 -> the transition probabilities matrix is asymmetric
     Args:
         x  --> segmentation : symbolic sequence, symbols = [0, 1, 2, ...]
+            Should be the  continuous segmentation: seg_smooth_cont
+            
         ns --> n_states : number of symbols
         alpha: significance level  0.01
     Returns:
@@ -216,10 +218,10 @@ def testMarkov0(seg, n_epochs, alpha, ns, epoched_data=True, verbose=True):
     
     T=0
     if epoched_data == False:
+        # for a single epoch
         f_ij = np.zeros((ns,ns))
         f_i = np.zeros(ns)
         f_j = np.zeros(ns)
-        # for a single epoch
         # calculate f_ij p( x[t]=i, p( x[t+1]=j ) )
         for t in range(n-1):
             i = seg[t]
@@ -267,4 +269,93 @@ def testMarkov0(seg, n_epochs, alpha, ns, epoched_data=True, verbose=True):
     print(("\t\tp: {:.2e} | t: {:.3f} | df: {:.1f}".format(p, T, df)))
     # For ns = 4, len(x)=201, alpha=0.01
         # Marginal value of T for significance is 21.68. For T > 21.68, p < alpha
-    return p
+    return p, T, df
+
+
+def testMarkov1(X, ns, alpha, verbose=True):
+    """Test first-order Markovianity of symbolic sequence X with ns symbols.
+    Null hypothesis:
+    first-order MC <=>
+    p(X[t+1] | X[t]) = p(X[t+1] | X[t], X[t-1])
+    cf. Kullback, Technometrics (1962), Tables 8.1, 8.2, 8.6.
+
+    Args:
+        x: symbolic sequence, symbols = [0, 1, 2, ...]
+        ns: number of symbols
+        alpha: significance level
+    Returns:
+        p: p-value of the Chi2 test for independence
+    """
+
+    if verbose:
+        print( "\n\t\tFIRST-ORDER MARKOVIANITY:" )
+    n = len(X)
+    f_ijk = np.zeros((ns,ns,ns))
+    f_ij = np.zeros((ns,ns))
+    f_jk = np.zeros((ns,ns))
+    f_j = np.zeros(ns)
+    for t in range(n-2):
+        i = X[t]
+        j = X[t+1]
+        k = X[t+2]
+        f_ijk[i,j,k] += 1.0
+        f_ij[i,j] += 1.0
+        f_jk[j,k] += 1.0
+        f_j[j] += 1.0
+    T = 0.0
+    for i, j, k in np.ndindex(f_ijk.shape):
+        f = f_ijk[i][j][k]*f_j[j]*f_ij[i][j]*f_jk[j][k]
+        if (f > 0):
+            T += (f_ijk[i,j,k]*np.log((f_ijk[i,j,k]*f_j[j])/(f_ij[i,j]*f_jk[j,k])))
+    T *= 2.0
+    df = ns*(ns-1)*(ns-1)
+    #p = chi2test(T, df, alpha)
+    p = chi2.sf(T, df, loc=0, scale=1)
+    if verbose:
+        print(("\t\tp: {:.2e} | t: {:.3f} | df: {:.1f}".format(p, T, df)))
+    return p, T, df
+
+
+def testMarkov2(X, ns, alpha, verbose=True):
+    """Test second-order Markovianity of symbolic sequence X with ns symbols.
+    Null hypothesis:
+    first-order MC <=>
+    p(X[t+1] | X[t], X[t-1]) = p(X[t+1] | X[t], X[t-1], X[t-2])
+    cf. Kullback, Technometrics (1962), Table 10.2.
+
+    Args:
+        x: symbolic sequence, symbols = [0, 1, 2, ...]
+        ns: number of symbols
+        alpha: significance level
+    Returns:
+        p: p-value of the Chi2 test for independence
+    """
+
+    if verbose:
+        print( "\n\t\tSECOND-ORDER MARKOVIANITY:" )
+    n = len(X)
+    f_ijkl = np.zeros((ns,ns,ns,ns))
+    f_ijk = np.zeros((ns,ns,ns))
+    f_jkl = np.zeros((ns,ns,ns))
+    f_jk = np.zeros((ns,ns))
+    for t in range(n-3):
+        i = X[t]
+        j = X[t+1]
+        k = X[t+2]
+        l = X[t+3]
+        f_ijkl[i,j,k,l] += 1.0
+        f_ijk[i,j,k] += 1.0
+        f_jkl[j,k,l] += 1.0
+        f_jk[j,k] += 1.0
+    T = 0.0
+    for i, j, k, l in np.ndindex(f_ijkl.shape):
+        f = f_ijkl[i,j,k,l]*f_ijk[i,j,k]*f_jkl[j,k,l]*f_jk[j,k]
+        if (f > 0):
+            T += (f_ijkl[i,j,k,l]*np.log((f_ijkl[i,j,k,l]*f_jk[j,k])/(f_ijk[i,j,k]*f_jkl[j,k,l])))
+    T *= 2.0
+    df = ns*ns*(ns-1)*(ns-1)
+    #p = chi2test(T, df, alpha)
+    p = chi2.sf(T, df, loc=0, scale=1)
+    if verbose:
+        print(("\t\tp: {:.2e} | t: {:.3f} | df: {:.1f}".format(p, T, df)))
+    return p, T, df

@@ -4,6 +4,7 @@ Functions to visualize microstates.
 import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+import seaborn as sns
 
 import mne
 
@@ -20,6 +21,12 @@ def plot_segmentation(segmentation, data, times, n_states=4):
     n_states : int
         The number of unique microstates to find. Defaults to 4.
     """
+    
+    colors = ["mediumpurple","steelblue", "skyblue","mediumseagreen"]
+    from matplotlib.colors import ListedColormap
+    my_cmap = ListedColormap(sns.color_palette(colors).as_hex())
+    
+    
     gfp = np.std(data, axis=0)
     
 #    n_states = len(np.unique(segmentation))
@@ -27,7 +34,7 @@ def plot_segmentation(segmentation, data, times, n_states=4):
     # as all the states might not appear in all subjects. 
     
     plt.figure(figsize=(6 * np.ptp(times), 2))
-    cmap = plt.cm.get_cmap('plasma', n_states)
+    cmap = my_cmap # plt.cm.get_cmap('plasma', n_states) # 
     plt.plot(times, gfp, color='black', linewidth=1)
     for state, color in zip(range(n_states), cmap.colors):
         plt.fill_between(times, gfp, color=color,

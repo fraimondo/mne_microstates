@@ -13,13 +13,14 @@ from scipy.stats import zscore
 from scipy.signal import find_peaks
 from scipy.linalg import eigh
 from scipy.signal import lfilter
+import matplotlib.pyplot as plt
 
 import mne
 from mne.utils import logger, verbose
 
 @verbose
-def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
-            use_peaks=True, normalize=False, min_peak_dist=2, max_n_peaks=10000,
+def segment(data, info, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
+            single_sub_data=True, normalize=False, min_peak_dist=2, max_n_peaks=10000,
             random_state=None, verbose=None):
     """Segment a continuous signal into microstates.
 
@@ -84,7 +85,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     logger.info('Finding %d microstates, using %d random intitializations' %
                 (n_states, n_inits))
     
-    if use_peaks == True: 
+    if single_sub_data == True: 
         if len(data.shape) == 3:
             logger.info('Finding microstates from epoched data.')
             n_epochs, n_chans, n_samples = data.shape
@@ -95,13 +96,10 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     if normalize:
         data = zscore(data, axis=1)
 
-    # Find peaks in the global field power (GFP)
-#    gfp = np.mean(data ** 2, axis=0)   
+    # Calculate the global field power (GFP)
     gfp = np.std(data, axis=0)
-    # Shouldn't it be this?
-    #        gfp_hm = np.std(data, axis=0)
     
-    if use_peaks == True: 
+    if single_sub_data == True: 
         
         # Find a limit for high GFP values
         # in this case the limit is at 1 standard deviation above the mean. 
@@ -137,7 +135,7 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         data_peaks = data[:, peaks]
 
     # Cache this value for later
-    gfp_sum_sq = np.sum(gfp ** 2)
+    gfp_sum_sq = np.sum(gfp ** 2) # normalizing constant in GEV
 
     # Do several runs of the k-means algorithm, keep track of the best
     # segmentation.
@@ -145,18 +143,18 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
     best_maps = None
     best_segmentation = None
     
-    if use_peaks == False:
+    if single_sub_data == False:
         data_peaks = data
 
     for _ in range(n_inits):
-        maps = _mod_kmeans(data_peaks, n_states, n_inits, max_iter, 
+        maps = _mod_kmeans(data_peaks, info, n_states, n_inits, max_iter, 
                            thresh, random_state, verbose)
         
         # Finding the segmentation for the whole data
         activation = maps.dot(data)
         segmentation = np.argmax(np.abs(activation), axis=0)
         map_corr = _corr_vectors(data, maps[segmentation].T)
-#        limmap = [i for i in map_corr if i > 0.5 or i < -0.5]
+        # limmap = [i for i in map_corr if i > 0.5 or i < -0.5]
 
         # Compare across iterations using global explained variance (GEV) of
         # the found microstates.
@@ -165,13 +163,23 @@ def segment(data, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
         if gev > best_gev:
             best_gev, best_maps, best_segmentation = gev, maps, segmentation
     
-    if use_peaks == True:
+    if single_sub_data == False:
+        # Reorder the maps
+        best_maps_re = _reorder_maps(best_maps, info, n_states)
+        # Re-calculate the segmentation and gev according to the new ordering
+        # Finding the segmentation for the whole data
+        best_activation = best_maps_re.dot(data)
+        best_segmentation = np.argmax(np.abs(best_activation), axis=0)
+        best_map_corr = _corr_vectors(data, best_maps_re[best_segmentation].T)
+        best_gev = sum((gfp * best_map_corr) ** 2) / gfp_sum_sq
+    
+    if single_sub_data == True:
         return best_maps, best_segmentation, best_gev, peaks #, map_corr, limmap
-    elif use_peaks == False:
-        return best_maps, best_gev
+    elif single_sub_data == False:
+        return best_maps_re, best_gev
 
 @verbose
-def _mod_kmeans(data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
+def _mod_kmeans(data_peaks, info, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
                 random_state=None, verbose=None):
     """The modified K-means clustering algorithm.
 
@@ -230,11 +238,76 @@ def _mod_kmeans(data_peaks, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             break
 
         prev_residual = residual
+        
     else:
         warnings.warn('Modified K-means algorithm failed to converge.')
 
     return maps
 
+
+def gev_per_map(data, maps, smooth_segmentation, n_epochs, n_samples, n_states):
+    """
+    Calculation of Global Explained Variance (GEV) per map/microstate.
+    
+    """
+    # Calculate the global field power (GFP)
+    gfp = np.std(data, axis=0)
+    gfp_sum_sq = np.sum(gfp ** 2) # normalizing constant in GEV
+    
+    # Finding the segmentation for the whole data
+    activation = maps.dot(data)
+    segmentation = np.argmax(np.abs(activation), axis=0)
+    map_corr = _corr_vectors(data, maps[smooth_segmentation].T)
+
+    # Compare across iterations using global explained variance (GEV) of
+    # the found microstates.
+    gev_per_map = sum((gfp * map_corr) ** 2) / gfp_sum_sq
+     
+    # --- GEV_k & GEV ---
+    # Not sure how to do this
+    # Maybe I mask all the instances that are different than k in segmentation
+    # and then I filter map_corr with this mask
+    gev_per_map = np.zeros(n_states)
+    for k in range(n_states):
+        r = segmentation==k
+        gev_per_map[k] = np.sum(gfp[r]**2 * map_corr[r,k]**2) / gfp_sum_sq
+    return gev_per_map
+
+def _reorder_maps(maps, info, n_states):
+    # %matplotlib inline
+    # Re-order the group maps 
+        
+    plt.figure(figsize=(2 * len(maps), 2))
+    for i, t_map in enumerate(maps):
+        plt.subplot(1, len(maps), i + 1)
+        mne.viz.plot_topomap(t_map, pos=info)
+        plt.title('%d' % i )
+    plt.savefig('C:/Users/Dragana/Desktop/' + 'msts.png')
+    plt.close()
+    
+    # Assign map labels manually
+    order_str = input("\n\t Assign map labels (e.g. 0, 2, 1, 3): ")
+    order_str = order_str.replace(",", "")
+    order_str = order_str.replace(" ", "")
+    if (len(order_str) != n_states):
+        if (len(order_str)==0):
+            print("\t\tEmpty input string.")
+        else:
+            print(("\t\tParsed manual input: {:s}".format(", ".join(order_str))))
+            print("\t\tNumber of labels does not equal number of clusters.")
+        print("\t\tContinue using the original assignment...\n")
+    else:
+        order = np.zeros(n_states, dtype=int)
+        for i, s in enumerate(order_str):
+            order[i] = int(s)
+        print(("\n\tRe-ordered labels: {:s}".format(", ".join(order_str))))
+        print(order)
+        # re-order return variables
+        #maps_re = maps[order,:]
+
+    maps_fin = maps[order,:] #maps_re[:]
+        
+    return maps_fin
 
 def _corr_vectors(A, B, axis=0):
     """Compute pairwise correlation of multiple pairs of vectors.
@@ -265,6 +338,7 @@ def _corr_vectors(A, B, axis=0):
     An /= np.linalg.norm(An, axis=axis)
     Bn /= np.linalg.norm(Bn, axis=axis)
     return np.sum(An * Bn, axis=axis)
+
 
 def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1000, thresh=1e-6, normalize=False):
     """
