@@ -398,10 +398,12 @@ def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1
             # Normalize the data if True (to be consistent w/ segment )
             if normalize:
                 data = zscore(data, axis=1)
-            seg_smooth = np.zeros(n_samples)
-            seg_smooth = _window_smoothing(data, maps, b=3, l=5, max_iterations=1000, thresh=1e-6)
+            #seg_smooth = np.zeros(n_samples)
+            #seg_orig_epo = np.zeros(n_samples)
+            seg_smooth, seg_orig_epo = _window_smoothing(data, maps, b=3, l=5, max_iterations=1000, thresh=1e-6)
     else:
         print('Unknown smoothing type: %s', smooth_type)
+    
     
     return seg_smooth, seg_orig_epo
 
