@@ -20,7 +20,7 @@ from mne.utils import logger, verbose
 
 @verbose
 def segment(data, info, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
-            single_sub_data=True, normalize=False, min_peak_dist=2, max_n_peaks=10000,
+            single_sub_data=True, normalize=False, reorder_maps=True, min_peak_dist=2, max_n_peaks=10000,
             random_state=None, verbose=None):
     """Segment a continuous signal into microstates.
 
@@ -164,19 +164,23 @@ def segment(data, info, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
             best_gev, best_maps, best_segmentation = gev, maps, segmentation
     
     if single_sub_data == False:
-        # Reorder the maps
-        best_maps_re = _reorder_maps(best_maps, info, n_states)
-        # Re-calculate the segmentation and gev according to the new ordering
-        # Finding the segmentation for the whole data
-        best_activation = best_maps_re.dot(data)
-        best_segmentation = np.argmax(np.abs(best_activation), axis=0)
-        best_map_corr = _corr_vectors(data, best_maps_re[best_segmentation].T)
-        best_gev = sum((gfp * best_map_corr) ** 2) / gfp_sum_sq
+        if reorder_maps == True:
+            # Reorder the maps
+            best_maps_re = _reorder_maps(best_maps, info, n_states)
+            # Re-calculate the segmentation and gev according to the new ordering
+            # Finding the segmentation for the whole data
+            best_activation = best_maps_re.dot(data)
+            best_segmentation = np.argmax(np.abs(best_activation), axis=0)
+            best_map_corr = _corr_vectors(data, best_maps_re[best_segmentation].T)
+            best_gev = sum((gfp * best_map_corr) ** 2) / gfp_sum_sq
     
     if single_sub_data == True:
         return best_maps, best_segmentation, best_gev, peaks #, map_corr, limmap
     elif single_sub_data == False:
-        return best_maps_re, best_gev
+        if reorder_maps == True:
+            return best_maps_re, best_gev
+        elif reorder_maps == False:
+            return best_maps, best_gev
 
 @verbose
 def _mod_kmeans(data_peaks, info, n_states=4, n_inits=10, max_iter=1000, thresh=1e-6,
@@ -286,7 +290,7 @@ def _reorder_maps(maps, info, n_states):
     plt.close()
     
     # Assign map labels manually
-    order_str = input("\n\t Assign map labels (e.g. 0, 2, 1, 3): ")
+    order_str = input("\n\t Assign map labels (like this: 0 2 1 3): ")
     order_str = order_str.replace(",", "")
     order_str = order_str.replace(" ", "")
     if (len(order_str) != n_states):
@@ -401,11 +405,30 @@ def seg_smoothing(data, maps, smooth_type='windowed', b=3, l=5, max_iterations=1
             #seg_smooth = np.zeros(n_samples)
             #seg_orig_epo = np.zeros(n_samples)
             seg_smooth, seg_orig_epo = _window_smoothing(data, maps, b=3, l=5, max_iterations=1000, thresh=1e-6)
+            
+            
+            #### TRIALS
+            # Remove the sigle sample map occurences which are a result of the smoothening
+            #
+            #
+            #seg_filtered = [x for x in seg_smooth if (seg_smooth[i-1] != seg_smooth[i]) and (seg_smooth[i+1] != seg_smooth[i])]
+            #n = len(seg_smooth)
+            #for i in range(n):
+            #    if (seg_smooth[i-1] != seg_smooth[i]) and (seg_smooth[i+1] != seg_smooth[i]):
+            #        del seg_smooth[i]
+            #        
+            #keep = np.ones(seg_smooth.shape, dtype=bool)
+            #for pos, val in enumerate(seg_smooth):
+            #    if val < ((seg_smooth[i-1] != seg_smooth[i]) and (seg_smooth[i+1] != seg_smooth[i])):
+            #        keep[pos] = False
+            #seg_smooth = seg_smooth[keep]
+            
+            
     else:
         print('Unknown smoothing type: %s', smooth_type)
-    
-    
+
     return seg_smooth, seg_orig_epo
+
 
 def _window_smoothing(data=None, maps=None, b=3, l=5, max_iterations=1000, thresh=1e-6):
     """
